@@ -173,6 +173,11 @@ def build_experiment_record(
         "do_not_repeat": [compact_text(str(item), 500) for item in do_not_repeat],
         "next_focus": compact_text(str(iteration.get("next_focus", "")), 1000),
         "experiment_plan": iteration.get("experiment_plan", {}),
+        "candidate_block_relative_errors": (
+            iteration.get("candidate_diagnostics", {}).get("block_relative_errors", {})
+            if isinstance(iteration.get("candidate_diagnostics"), dict)
+            else {}
+        ),
         "patch_fingerprint": str(
             iteration.get("patch_fingerprint") or patch_fingerprint(patch_text)
         ),
@@ -664,6 +669,12 @@ def reviewer_agent(
         [
             "# 迭代前状态",
             json.dumps(agent_state_snapshot(state), ensure_ascii=False, indent=2),
+            "# 候选前矩阵诊断",
+            json.dumps(
+                state.get("current_verification", {}).get("diagnostics", {}),
+                ensure_ascii=False,
+                indent=2,
+            ),
             "# 本轮事实",
             json.dumps(iteration, ensure_ascii=False, indent=2),
             "# 跨运行历史实验记忆",

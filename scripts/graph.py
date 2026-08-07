@@ -340,8 +340,10 @@ def candidate_test_node(state: GraphState) -> dict[str, Any]:
     if "metrics" in candidate:
         iteration["candidate_error"] = candidate["metrics"]["frobenius_relative_error"]
         iteration["candidate_metrics"] = candidate["metrics"]
+        iteration["candidate_diagnostics"] = candidate.get("diagnostics", {})
     else:
         iteration["candidate_error"] = None
+        iteration["candidate_diagnostics"] = {}
     return {"iteration": iteration}
 
 

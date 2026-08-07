@@ -169,6 +169,12 @@ END_UNIFIED_DIFF"""
                 "failure_mechanism": "剪切刚度过大",
                 "do_not_repeat": ["四边中点直接积分"],
                 "next_focus": "检查局部转角符号",
+                "candidate_diagnostics": {
+                    "block_relative_errors": {
+                        "membrane_xy__membrane_xy": 0.08,
+                        "bending_shear__bending_shear": 0.25,
+                    }
+                },
             }
             record = build_experiment_record("run-test", iteration, iteration_dir)
             memory = {"schema_version": 1, "experiments": []}
@@ -180,6 +186,10 @@ END_UNIFIED_DIFF"""
             rendered = render_experiment_memory(memory)
             self.assertIn("四边中点直接积分", rendered)
             self.assertIn("剪切刚度过大", rendered)
+            self.assertEqual(
+                record["candidate_block_relative_errors"]["bending_shear__bending_shear"],
+                0.25,
+            )
 
     def test_updates_dedicated_progress_document(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
