@@ -4,12 +4,17 @@
 from __future__ import annotations
 
 import unittest
+import json
+import tempfile
+from pathlib import Path
 from unittest.mock import patch
 
 from shell_agent.api_check import perform_api_check
 from shell_agent.cli import build_parser
 from shell_agent.verification import run_verification
 from shell_agent.dataset_verification import load_dataset, summarize_split
+from shell_agent.dataset_plan import validate_dataset_plan
+from shell_agent.dataset_registry import check_test_lock, validate_sample_artifacts
 
 
 class ShellAgentCliTests(unittest.TestCase):
@@ -30,6 +35,17 @@ class ShellAgentCliTests(unittest.TestCase):
         dataset = parser.parse_args(["verify-dataset", "--require-test"])
         self.assertEqual(dataset.command, "verify-dataset")
         self.assertTrue(dataset.require_test)
+
+        plan = parser.parse_args(["validate-data-plan", "plan.json"])
+        self.assertEqual(plan.command, "validate-data-plan")
+
+        register = parser.parse_args(
+            ["register-sample", "--meta", "sample.json", "--split", "validation"]
+        )
+        self.assertEqual(register.split, "validation")
+
+        lock = parser.parse_args(["check-test-lock"])
+        self.assertEqual(lock.command, "check-test-lock")
 
     @patch("shell_agent.verification.run_checked", side_effect=[0, 0, 0, 0])
     def test_verification_driver_uses_four_direct_process_calls(self, mocked_run) -> None:
@@ -55,8 +71,39 @@ class ShellAgentCliTests(unittest.TestCase):
     def test_dataset_manifest_has_disjoint_train_and_test_splits(self) -> None:
         dataset = load_dataset()
         self.assertTrue(dataset["train"])
-        self.assertFalse(set(dataset["train"]) & set(dataset["test"]))
+        membership = dataset["train"] + dataset["validation"] + dataset["test"]
+        self.assertEqual(len(membership), len(set(membership)))
         self.assertFalse(summarize_split([])["ready"])
+
+    def test_accepts_example_dataset_plan(self) -> None:
+        plan = validate_dataset_plan(
+            Path("data/datasets/plans/example_train_batch.json")
+        )
+        self.assertEqual(plan["split"], "train")
+        self.assertEqual(plan["samples"][0]["sample_id"], "sample_002")
+
+    def test_rejects_adaptive_test_plan(self) -> None:
+        source = json.loads(
+            Path("data/datasets/plans/example_train_batch.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        source["split"] = "test"
+        source["selection_policy"] = "coverage_driven"
+        with tempfile.TemporaryDirectory() as directory:
+            plan_path = Path(directory) / "plan.json"
+            plan_path.write_text(json.dumps(source), encoding="utf-8")
+            with self.assertRaises(ValueError):
+                validate_dataset_plan(plan_path)
+
+    def test_validates_real_sample_and_reports_empty_test_lock(self) -> None:
+        artifact = validate_sample_artifacts(
+            Path("data/abaqus/meta/sample_001.json")
+        )
+        self.assertEqual(artifact["sample_id"], "sample_001")
+        passed, message = check_test_lock()
+        self.assertFalse(passed)
+        self.assertIn("为空", message)
 
 
 if __name__ == "__main__":

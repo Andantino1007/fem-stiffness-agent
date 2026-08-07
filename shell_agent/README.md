@@ -7,6 +7,9 @@
 ```bash
 python -m shell_agent verify
 python -m shell_agent verify-dataset
+python -m shell_agent validate-data-plan data/datasets/plans/example_train_batch.json
+python -m shell_agent register-sample --meta <meta.json> --split train
+python -m shell_agent check-test-lock
 python -m shell_agent check
 python -m shell_agent api-check
 python -m shell_agent run --max-iterations 3 --target-error 0.01

@@ -4,5 +4,6 @@
   "train": [
     "data/abaqus/meta/sample_001.json"
   ],
+  "validation": [],
   "test": []
 }

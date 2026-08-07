@@ -31,15 +31,19 @@ def load_dataset(path: Path = DEFAULT_DATASET) -> dict[str, Any]:
     if payload.get("schema_version") != 1:
         raise ValueError("数据集 schema_version 必须为 1")
     train = payload.get("train")
+    validation = payload.get("validation")
     test = payload.get("test")
     if not isinstance(train, list) or not train or not all(isinstance(item, str) for item in train):
         raise ValueError("数据集 train 必须是非空路径数组")
+    if not isinstance(validation, list) or not all(isinstance(item, str) for item in validation):
+        raise ValueError("数据集 validation 必须是路径数组")
     if not isinstance(test, list) or not all(isinstance(item, str) for item in test):
         raise ValueError("数据集 test 必须是路径数组")
-    duplicates = sorted(set(train) & set(test))
+    membership = [*train, *validation, *test]
+    duplicates = sorted({item for item in membership if membership.count(item) > 1})
     if duplicates:
-        raise ValueError(f"训练集和测试集不能重叠：{duplicates}")
-    for relative in [*train, *test]:
+        raise ValueError(f"train/validation/test 不能重叠：{duplicates}")
+    for relative in membership:
         sample_path = ROOT / relative
         if not sample_path.is_file():
             raise ValueError(f"数据集样本不存在：{relative}")
@@ -101,7 +105,7 @@ def run_dataset_verification(
         "splits": {},
     }
     reports_dir = BUILD_DIR / "dataset-reports"
-    for split in ("train", "test"):
+    for split in ("train", "validation", "test"):
         samples: list[dict[str, Any]] = []
         for relative in dataset[split]:
             meta_path = ROOT / relative
@@ -133,19 +137,37 @@ def run_dataset_verification(
     if code != 0:
         return code
 
+    result["validation_ready"] = bool(result["splits"]["validation"]["summary"]["ready"])
     result["test_ready"] = bool(result["splits"]["test"]["summary"]["ready"])
+    test_lock_valid = False
+    test_lock_message = "测试集为空"
+    if result["test_ready"]:
+        from .dataset_registry import check_test_lock
+
+        test_lock_valid, test_lock_message = check_test_lock(dataset_path)
+    result["test_lock_valid"] = test_lock_valid
+    result["test_lock_message"] = test_lock_message
+    result["final_evaluation_ready"] = bool(
+        result["validation_ready"] and result["test_ready"] and test_lock_valid
+    )
     result_path = result_path if result_path.is_absolute() else ROOT / result_path
     result_path.parent.mkdir(parents=True, exist_ok=True)
     result_path.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
     train_summary = result["splits"]["train"]["summary"]
+    validation_summary = result["splits"]["validation"]["summary"]
     test_summary = result["splits"]["test"]["summary"]
     print()
     print("Dataset verification completed.")
     print(f"Train: {train_summary['sample_count']} sample(s), worst error={train_summary['worst_frobenius_relative_error']}")
+    if result["validation_ready"]:
+        print(f"Validation: {validation_summary['sample_count']} sample(s), worst error={validation_summary['worst_frobenius_relative_error']}")
+    else:
+        print("Validation: 0 sample(s), validation_ready=false")
     if result["test_ready"]:
         print(f"Test: {test_summary['sample_count']} sample(s), worst error={test_summary['worst_frobenius_relative_error']}")
+        print(f"Test lock: {'valid' if test_lock_valid else 'invalid'} ({test_lock_message})")
     else:
         print("Test: 0 sample(s), test_ready=false (需要新增独立 Abaqus 基准)")
     print(f"Result: {result_path.relative_to(ROOT)}")
-    return 5 if require_test and not result["test_ready"] else 0
+    return 5 if require_test and not result["final_evaluation_ready"] else 0

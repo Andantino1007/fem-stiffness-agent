@@ -10,6 +10,12 @@ from pathlib import Path
 from .api_check import perform_api_check, print_api_check
 from .verification import DEFAULT_REPORT, ROOT, run_verification
 from .dataset_verification import DEFAULT_DATASET, DEFAULT_DATASET_RESULT, run_dataset_verification
+from .dataset_plan import validate_dataset_plan_command
+from .dataset_registry import (
+    DEFAULT_TEST_LOCK,
+    check_test_lock_command,
+    register_sample_command,
+)
 
 
 SCRIPTS_DIR = ROOT / "scripts"
@@ -49,6 +55,33 @@ def build_parser() -> argparse.ArgumentParser:
     verify_dataset.add_argument(
         "--dataset", type=Path, default=DEFAULT_DATASET.relative_to(ROOT)
     )
+
+    validate_plan = subparsers.add_parser(
+        "validate-data-plan", help="在调用 Abaqus 前校验 Dataset Planner 计划。"
+    )
+    validate_plan.add_argument("plan", type=Path)
+    validate_plan.add_argument(
+        "--dataset", type=Path, default=DEFAULT_DATASET.relative_to(ROOT)
+    )
+
+    register = subparsers.add_parser(
+        "register-sample", help="验证真实 Abaqus 产物并登记到数据集。"
+    )
+    register.add_argument("--meta", type=Path, required=True)
+    register.add_argument("--split", choices=("train", "validation", "test"), required=True)
+    register.add_argument(
+        "--dataset", type=Path, default=DEFAULT_DATASET.relative_to(ROOT)
+    )
+
+    check_lock = subparsers.add_parser(
+        "check-test-lock", help="检查锁定测试集的清单和文件哈希。"
+    )
+    check_lock.add_argument(
+        "--dataset", type=Path, default=DEFAULT_DATASET.relative_to(ROOT)
+    )
+    check_lock.add_argument(
+        "--lock", type=Path, default=DEFAULT_TEST_LOCK.relative_to(ROOT)
+    )
     verify_dataset.add_argument(
         "--result", type=Path, default=DEFAULT_DATASET_RESULT.relative_to(ROOT)
     )
@@ -80,6 +113,12 @@ def main(argv: list[str] | None = None) -> int:
         return run_verification(args.report)
     if args.command == "verify-dataset":
         return run_dataset_verification(args.dataset, args.result, args.require_test)
+    if args.command == "validate-data-plan":
+        return validate_dataset_plan_command(args.plan, args.dataset)
+    if args.command == "register-sample":
+        return register_sample_command(args.meta, args.split, args.dataset)
+    if args.command == "check-test-lock":
+        return check_test_lock_command(args.dataset, args.lock)
     if args.command == "check":
         return load_langgraph_main()(["--check"])
     if args.command == "api-check":
