@@ -45,6 +45,11 @@ BLOCK_METRIC_KEYS = {
     for col_name in BLOCK_NAMES
 }
 ALLOWED_EXPECTED_METRICS = GLOBAL_METRIC_KEYS | BLOCK_METRIC_KEYS
+MIN_FROBENIUS_ABSOLUTE_DROP = 1.0e-6
+MIN_FROBENIUS_RELATIVE_DROP = 1.0e-4
+MAX_SYMMETRY_ERROR = 1.0e-12
+MAX_ABSOLUTE_ERROR_REGRESSION = 0.01
+MAX_NON_TARGET_BLOCK_REGRESSION = 0.05
 BANNED_ADDED_TOKENS = {
     "system(",
     "popen(",
@@ -440,6 +445,115 @@ def compare_expected_metrics(
     return comparison
 
 
+def evaluate_candidate_gate(
+    baseline: dict[str, Any],
+    candidate: dict[str, Any],
+    primary_metric: str,
+    test_passed: bool,
+) -> dict[str, Any]:
+    """执行不受 Agent 控制的本地数值接受门槛。"""
+    before_metrics = baseline.get("metrics", {})
+    after_metrics = candidate.get("metrics", {})
+    before_blocks = baseline.get("diagnostics", {}).get("block_relative_errors", {})
+    after_blocks = candidate.get("diagnostics", {}).get("block_relative_errors", {})
+
+    required_global = {
+        "frobenius_relative_error",
+        "max_absolute_error",
+        "symmetry_error",
+    }
+    missing_global = sorted(
+        key
+        for key in required_global
+        if key not in before_metrics or key not in after_metrics
+    )
+    missing_blocks = sorted(
+        key for key in BLOCK_METRIC_KEYS if key not in before_blocks or key not in after_blocks
+    )
+    if missing_global or missing_blocks or primary_metric not in BLOCK_METRIC_KEYS:
+        return {
+            "passed": False,
+            "test_passed": bool(test_passed),
+            "reason": "missing-or-invalid-metrics",
+            "missing_global_metrics": missing_global,
+            "missing_block_metrics": missing_blocks,
+            "primary_metric": primary_metric,
+        }
+
+    before_frobenius = float(before_metrics["frobenius_relative_error"])
+    after_frobenius = float(after_metrics["frobenius_relative_error"])
+    absolute_drop = before_frobenius - after_frobenius
+    relative_drop = absolute_drop / before_frobenius if before_frobenius > 0.0 else 0.0
+    frobenius_improved = (
+        absolute_drop >= MIN_FROBENIUS_ABSOLUTE_DROP
+        and relative_drop >= MIN_FROBENIUS_RELATIVE_DROP
+    )
+
+    primary_before = float(before_blocks[primary_metric])
+    primary_after = float(after_blocks[primary_metric])
+    primary_improved = primary_after < primary_before
+
+    symmetry_after = float(after_metrics["symmetry_error"])
+    symmetry_passed = symmetry_after < MAX_SYMMETRY_ERROR
+
+    max_absolute_before = float(before_metrics["max_absolute_error"])
+    max_absolute_after = float(after_metrics["max_absolute_error"])
+    max_absolute_limit = max_absolute_before * (1.0 + MAX_ABSOLUTE_ERROR_REGRESSION)
+    max_absolute_passed = max_absolute_after <= max_absolute_limit
+
+    block_regressions: dict[str, dict[str, float]] = {}
+    for key in sorted(BLOCK_METRIC_KEYS - {primary_metric}):
+        before = float(before_blocks[key])
+        after = float(after_blocks[key])
+        limit = before * (1.0 + MAX_NON_TARGET_BLOCK_REGRESSION)
+        if (before > 1.0e-12 and after > limit) or (
+            before <= 1.0e-12 and after > 1.0e-12
+        ):
+            block_regressions[key] = {
+                "before": before,
+                "after": after,
+                "limit": limit if before > 1.0e-12 else 1.0e-12,
+            }
+
+    passed = bool(
+        test_passed
+        and frobenius_improved
+        and primary_improved
+        and symmetry_passed
+        and max_absolute_passed
+        and not block_regressions
+    )
+    return {
+        "passed": passed,
+        "test_passed": bool(test_passed),
+        "primary_metric": primary_metric,
+        "frobenius": {
+            "before": before_frobenius,
+            "after": after_frobenius,
+            "absolute_drop": absolute_drop,
+            "relative_drop": relative_drop,
+            "passed": frobenius_improved,
+        },
+        "primary": {
+            "before": primary_before,
+            "after": primary_after,
+            "passed": primary_improved,
+        },
+        "symmetry": {
+            "after": symmetry_after,
+            "limit": MAX_SYMMETRY_ERROR,
+            "passed": symmetry_passed,
+        },
+        "max_absolute_error": {
+            "before": max_absolute_before,
+            "after": max_absolute_after,
+            "limit": max_absolute_limit,
+            "passed": max_absolute_passed,
+        },
+        "non_target_block_regressions": block_regressions,
+    }
+
+
 def run_verification(iteration_dir: Path, label: str) -> dict[str, Any]:
     log_path = iteration_dir / f"verification-{label}.log"
     report_mtime = REPORT_PATH.stat().st_mtime_ns if REPORT_PATH.exists() else None
@@ -544,6 +658,7 @@ def validate_experiment_plan(plan: dict[str, Any]) -> dict[str, Any]:
         "target_block",
         "mechanism",
         "difference_from_history",
+        "primary_metric",
     }
     missing = [
         key for key in required_strings
@@ -582,6 +697,13 @@ def validate_experiment_plan(plan: dict[str, Any]) -> dict[str, Any]:
             "Experiment Planner 使用了未知 expected_metrics："
             f"{invalid_metrics}；允许值：{sorted(ALLOWED_EXPECTED_METRICS)}"
         )
+    if plan["primary_metric"] not in BLOCK_METRIC_KEYS:
+        raise ValueError(
+            "Experiment Planner 的 primary_metric 必须是合法分块指标："
+            f"{plan['primary_metric']}"
+        )
+    if plan["primary_metric"] not in expected_metrics:
+        raise ValueError("Experiment Planner 的 primary_metric 必须包含在 expected_metrics 中")
     return plan
 
 

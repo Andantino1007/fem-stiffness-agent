@@ -24,6 +24,7 @@ from agents import (
     compare_expected_metrics,
     console,
     developer_patch_with_retry,
+    evaluate_candidate_gate,
     experiment_planner_agent,
     find_duplicate_patch,
     load_experiment_memory,
@@ -348,11 +349,22 @@ def candidate_test_node(state: GraphState) -> dict[str, Any]:
             candidate,
         )
         iteration["expected_metrics_available"] = True
+        iteration["local_gate_details"] = evaluate_candidate_gate(
+            state["current_verification"],
+            candidate,
+            str(state["experiment_plan"].get("primary_metric", "")),
+            bool(iteration["test_passed"]),
+        )
     else:
         iteration["candidate_error"] = None
         iteration["candidate_diagnostics"] = {}
         iteration["expected_metric_comparison"] = {}
         iteration["expected_metrics_available"] = False
+        iteration["local_gate_details"] = {
+            "passed": False,
+            "test_passed": bool(iteration["test_passed"]),
+            "reason": "candidate-verification-unavailable",
+        }
     return {"iteration": iteration}
 
 
@@ -385,14 +397,10 @@ def decision_node(state: GraphState) -> dict[str, Any]:
     """执行本地硬门槛；接受时重新应用已测试补丁并复验。"""
     iteration = dict(state["iteration"])
     candidate_error = iteration.get("candidate_error")
-    improved = bool(
-        iteration.get("test_passed")
-        and iteration.get("expected_metrics_available")
-        and candidate_error is not None
-        and candidate_error < state["current_error"] - 1.0e-9
-    )
-    accepted = improved and iteration.get("reviewer_decision") == "accept"
-    iteration["local_improvement_gate"] = improved
+    gate = iteration.get("local_gate_details", {"passed": False})
+    accepted = gate["passed"] and iteration.get("reviewer_decision") == "accept"
+    iteration["local_gate_details"] = gate
+    iteration["local_improvement_gate"] = gate["passed"]
     iteration["accepted"] = accepted
 
     updates: dict[str, Any] = {"iteration": iteration}

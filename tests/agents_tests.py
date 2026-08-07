@@ -16,6 +16,7 @@ from agents import (
     agent_state_snapshot,
     build_experiment_record,
     compare_expected_metrics,
+    evaluate_candidate_gate,
     extract_json_object,
     extract_unified_diff,
     find_duplicate_patch,
@@ -106,9 +107,13 @@ END_UNIFIED_DIFF"""
             "experiment_class": "membrane",
             "target_block": "membrane_xy",
             "mechanism": "核对平面应力本构系数",
+            "primary_metric": "membrane_xy__membrane_xy",
             "allowed_changes": ["膜本构矩阵"],
             "forbidden_changes": ["剪切符号"],
-            "expected_metrics": ["frobenius_relative_error"],
+            "expected_metrics": [
+                "frobenius_relative_error",
+                "membrane_xy__membrane_xy",
+            ],
             "difference_from_history": "历史尚未单独验证该系数",
         }
         self.assertEqual(validate_experiment_plan(plan), plan)
@@ -141,6 +146,51 @@ END_UNIFIED_DIFF"""
         self.assertAlmostEqual(
             comparison["bending_shear__bending_shear"]["delta"], -0.05
         )
+
+    def test_candidate_gate_requires_meaningful_global_and_primary_improvement(self) -> None:
+        block_keys = {
+            f"{row}__{col}"
+            for row in ("membrane_xy", "bending_shear", "drilling")
+            for col in ("membrane_xy", "bending_shear", "drilling")
+        }
+        before_blocks = {key: 0.20 for key in block_keys}
+        after_blocks = dict(before_blocks)
+        after_blocks["bending_shear__bending_shear"] = 0.18
+        baseline = {
+            "metrics": {
+                "frobenius_relative_error": 0.10,
+                "max_absolute_error": 100.0,
+                "symmetry_error": 1.0e-18,
+            },
+            "diagnostics": {"block_relative_errors": before_blocks},
+        }
+        candidate = {
+            "metrics": {
+                "frobenius_relative_error": 0.09,
+                "max_absolute_error": 100.5,
+                "symmetry_error": 1.0e-18,
+            },
+            "diagnostics": {"block_relative_errors": after_blocks},
+        }
+        gate = evaluate_candidate_gate(
+            baseline, candidate, "bending_shear__bending_shear", True
+        )
+        self.assertTrue(gate["passed"])
+
+        regressed = {
+            **candidate,
+            "diagnostics": {
+                "block_relative_errors": {
+                    **after_blocks,
+                    "drilling__drilling": 0.22,
+                }
+            },
+        }
+        rejected = evaluate_candidate_gate(
+            baseline, regressed, "bending_shear__bending_shear", True
+        )
+        self.assertFalse(rejected["passed"])
+        self.assertIn("drilling__drilling", rejected["non_target_block_regressions"])
 
     def test_semantic_patch_fingerprint_ignores_comments_and_hunk_lines(self) -> None:
         first = """--- a/src/shell/ShellStiffness.cpp

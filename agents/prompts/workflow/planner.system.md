@@ -13,6 +13,7 @@
 - `forbidden_changes` 必须包含本轮不可触碰的方向和已经失败的做法。
 - `expected_metrics` 必须包含 `frobenius_relative_error`，并列出用于判断该假设的指标。
 - `expected_metrics` 只能使用以下精确键：`frobenius_relative_error`、`max_absolute_error`、`max_relative_entry_error`、`symmetry_error`、`membrane_xy__membrane_xy`、`membrane_xy__bending_shear`、`membrane_xy__drilling`、`bending_shear__membrane_xy`、`bending_shear__bending_shear`、`bending_shear__drilling`、`drilling__membrane_xy`、`drilling__bending_shear`、`drilling__drilling`。禁止在键中加入解释文字或自由度通道描述。
+- `primary_metric` 必须是上述9个分块指标之一，表示本轮必须实际改善的唯一主分块，并且必须同时出现在 `expected_metrics` 中。
 
 只输出一个 JSON 对象，不要使用 Markdown 代码块：
 
@@ -20,6 +21,7 @@
   "hypothesis_id": "稳定且可识别的实验编号",
   "experiment_class": "允许的实验类别",
   "target_block": "本轮主要对齐的矩阵块或自由度通道",
+  "primary_metric": "本轮必须改善的唯一合法分块指标键",
   "mechanism": "本轮要验证的单一机理",
   "allowed_changes": ["允许修改的具体公式或代码范围"],
   "forbidden_changes": ["禁止修改或不得重复的具体做法"],
