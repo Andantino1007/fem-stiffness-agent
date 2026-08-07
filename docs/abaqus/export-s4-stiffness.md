@@ -1,0 +1,182 @@
+# Abaqus S4 单元 24x24 单刚导出方法
+
+本文档用于生成需求2的 Abaqus 基准单刚矩阵。当前项目的目标口径是：单个 Abaqus S4 壳单元，4 个节点，每节点 6 个自由度，因此单元刚度矩阵尺寸为 24 x 24。
+
+## 1. 准备输入文件
+
+项目中已经给出模板：
+
+```text
+data/abaqus/input/sample_001_s4_matrix_export.inp
+```
+
+核心关键词是：
+
+```text
+*STEP, NAME=EXPORT_STIFFNESS
+*MATRIX GENERATE, STIFFNESS
+*MATRIX OUTPUT, STIFFNESS, FORMAT=COORDINATE
+*END STEP
+```
+
+这一步不做普通位移求解，而是让 Abaqus 生成刚度矩阵输出。
+
+不要在当前阶段使用 `ELEMENT BY ELEMENT`。在部分 Abaqus 版本中，该模式会进入 SIM element-matrix stream，日志里虽然会出现 `STIF1.mtx` 字样，但目录中不一定留下外部 `.mtx` 文件；而且输出统计可能不是 24 x 24。
+
+## 2. 在 Abaqus 中运行
+
+在 Abaqus Command 或终端中进入项目目录，然后执行：
+
+```bash
+abaqus job=sample_001_s4_matrix_export input=data/abaqus/input/sample_001_s4_matrix_export.inp interactive
+```
+
+如果是在 Windows Abaqus Command 中运行，需要先切换到项目目录，再执行同样的 job 命令。
+
+## 3. 将 SIM 中的矩阵转成文本 `.mtx`
+
+当前 Abaqus 版本可能不会直接留下外部 `.mtx`，而是生成：
+
+```text
+sample_001_s4_matrix_export_X1.sim
+```
+
+这时继续运行：
+
+```bat
+abaqus mtxasm job=sample_001_s4_matrix_export_X1 text
+```
+
+成功日志一般类似：
+
+```text
+Will write assembled operators in sample_001_s4_matrix_export_X1.sim to text files sample_001_s4_matrix_export_X1_OperIdInc#.mtx
+Wrote assembled matrices for increment -1 to txt file
+```
+
+然后查找生成的文本矩阵：
+
+```bat
+dir sample_001_s4_matrix_export_X1*.mtx
+```
+
+文件名通常类似：
+
+```text
+sample_001_s4_matrix_export_X1_STIF-1.mtx
+```
+
+## 4. 转换为项目使用的 24x24 CSV
+
+把 `.mtx` 转为项目当前基准矩阵：
+
+```bash
+python3 scripts/abaqus/convert_abaqus_mtx_to_csv.py \
+  sample_001_s4_matrix_export_X1_STIF-1.mtx \
+  data/abaqus/matrix/sample_001_abaqus_s4.csv
+```
+
+Windows `cmd` 中可写成：
+
+```bat
+python scripts\abaqus\convert_abaqus_mtx_to_csv.py sample_001_s4_matrix_export_X1_STIF-1.mtx data\abaqus\matrix\sample_001_abaqus_s4.csv
+```
+
+如果已经同步了支持通配符的新脚本，也可以：
+
+```bat
+python scripts\abaqus\convert_abaqus_mtx_to_csv.py sample_001_s4_matrix_export_X1*.mtx data\abaqus\matrix\sample_001_abaqus_s4.csv
+```
+
+然后重新运行：
+
+```bash
+python -m shell_agent verify
+```
+
+## 5. 当前项目约定
+
+- 节点顺序：1, 2, 3, 4，逆时针。
+- 每节点自由度顺序：`ux uy uz urx ury urz`。
+- 24x24 排列顺序：
+  - 1 到 6：节点 1 的 6 个自由度。
+  - 7 到 12：节点 2 的 6 个自由度。
+  - 13 到 18：节点 3 的 6 个自由度。
+  - 19 到 24：节点 4 的 6 个自由度。
+
+## 6. 注意事项
+
+- 当前阶段先导出单个 S4 单元，后续再扩展到 X 个样本。
+- 如果 `.mtx` 文件里只有三列 `row, column, value`，转换脚本会按 1-based 矩阵下标处理。
+- 如果 `.mtx` 文件里是五列 `node_i, dof_i, node_j, dof_j, value`，转换脚本会按节点和自由度映射到 24x24。
+- Abaqus 输出有时只给上三角或下三角；转换脚本会自动对称填充。
+- 替换真实 Abaqus CSV 后，阶段 1 报告中的误差才有工程意义。
+
+## 7. 如果日志显示写入 SIM 但目录没有 `.mtx`
+
+如果 `.dat/.msg` 里出现类似：
+
+```text
+THE FOLLOWING ELEMENT MATRICES WILL BE GENERATED AND WRITTEN TO ..._X1.sim
+ELEMENT MATRIX OUTPUT TO SIM
+TOTAL MATRIX SIZE 300
+```
+
+说明当前跑的是 `ELEMENT BY ELEMENT` 路径，不是项目第一阶段需要的 24 x 24 外部矩阵。请把输入文件改为：
+
+```text
+*STEP, NAME=EXPORT_STIFFNESS
+*MATRIX GENERATE, STIFFNESS
+*MATRIX OUTPUT, STIFFNESS, FORMAT=COORDINATE
+*END STEP
+```
+
+然后重新运行 Abaqus job。
+
+如果仍然只生成 `_X1.sim` 而没有外部 `.mtx`，优先先运行：
+
+```bat
+abaqus mtxasm job=sample_001_s4_matrix_export_X1 text
+```
+
+只有当 `mtxasm` 路径也不可用时，再采用下面的反力法导出。
+
+## 8. 稳定备用方案：24 个单位位移 Step 反推出刚度矩阵
+
+这个方案不依赖 `.mtx` 文件。思路是：对 24 个自由度逐个施加单位位移，其余自由度固定为 0，每个 Step 的 24 个反力/反力矩就是刚度矩阵的一列。
+
+先在 Mac 或 PC 上生成 Abaqus 输入文件：
+
+```bash
+python3 scripts/abaqus/generate_s4_reaction_export_inp.py
+```
+
+会生成：
+
+```text
+data/abaqus/input/sample_001_s4_reaction_export.inp
+```
+
+在 PC 的 Abaqus Command 中运行：
+
+```bat
+abaqus job=sample_001_s4_reaction_export input=data\abaqus\input\sample_001_s4_reaction_export.inp interactive
+```
+
+运行完成后，用 Abaqus Python 从 ODB 提取矩阵：
+
+```bat
+abaqus python scripts\abaqus\extract_reaction_stiffness_from_odb.py sample_001_s4_reaction_export.odb data\abaqus\matrix\sample_001_abaqus_s4.csv
+```
+
+如果后续发现整体符号与 C++ 实现相反，再用：
+
+```bat
+abaqus python scripts\abaqus\extract_reaction_stiffness_from_odb.py sample_001_s4_reaction_export.odb data\abaqus\matrix\sample_001_abaqus_s4.csv --negate
+```
+
+最后回到项目流程：
+
+```bash
+python -m shell_agent verify
+```

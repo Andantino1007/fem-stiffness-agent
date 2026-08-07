@@ -1,0 +1,28 @@
+{
+  "sample_id": "sample_001",
+  "element_type": "Abaqus S4",
+  "node_order": "counterclockwise",
+  "dof_order_per_node": ["x", "y", "z", "rx", "ry", "rz"],
+  "nodes": [
+    {"id": 1, "coord": [0.0, 0.0, 0.0]},
+    {"id": 2, "coord": [1.0, 0.0, 0.0]},
+    {"id": 3, "coord": [1.0, 1.0, 0.0]},
+    {"id": 4, "coord": [0.0, 1.0, 0.0]}
+  ],
+  "material": {
+    "type": "isotropic_linear_elastic",
+    "E": 210000000000.0,
+    "nu": 0.3
+  },
+  "section": {
+    "thickness": 0.01
+  },
+  "abaqus_matrix_source": {
+    "status": "real_abaqus_export",
+    "method": "MATRIX GENERATE -> X1.sim -> abaqus mtxasm text -> STIF-1.mtx -> CSV",
+    "source_mtx_name": "sample_001_s4_matrix_export_X1_STIF-1.mtx",
+    "parsed_entries": 198
+  },
+  "abaqus_matrix": "data/abaqus/matrix/sample_001_abaqus_s4.csv",
+  "cpp_matrix": "data/cpp/sample_001_cpp.csv"
+}

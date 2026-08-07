@@ -1,0 +1,37 @@
+# 壳单元刚度验证报告：sample_001
+
+## 样本信息
+- element_type: Abaqus S4
+- node_order: counterclockwise
+- dof_order_per_node: x y z rx ry rz
+- E: 2.1e+11
+- nu: 0.3
+- thickness: 0.01
+
+## 当前实现
+- 实现：四节点 Reissner-Mindlin 壳单元物理基线
+- 理论：四节点 Reissner-Mindlin 壳
+- 面内/弯曲：2 x 2 Gauss 积分
+- 横向剪切：2 x 2 Gauss 积分
+- 钻转：罚刚度 alpha=0.0085
+- 几何范围：平面四边形
+
+## 文件清单
+- Abaqus matrix: data/abaqus/matrix/sample_001_abaqus_s4.csv
+- C++ matrix: data/cpp/sample_001_cpp.csv
+
+## 分量 Frobenius 范数
+- membrane: 3.92458e+09
+- bending: 33722.5
+- shear: 8.64277e+08
+- drilling: 1.90705e+06
+- total: 4.01863e+09
+
+## 误差指标
+- Frobenius relative error: 0.0595967
+- max absolute error: 7.47863e+07
+- max relative entry error: 3.8141e+17
+- symmetry error: 8.29142e-18
+
+## 指标说明
+逐项最大相对误差可能被 Abaqus 接近零的条目放大；Frobenius 相对误差用于衡量矩阵整体差异。

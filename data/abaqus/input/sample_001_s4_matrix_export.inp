@@ -1,0 +1,27 @@
+*HEADING
+sample_001: export element-by-element stiffness matrix for a single Abaqus S4 shell
+**
+** Node order: 1-2-3-4 counterclockwise
+** DOF order expected by this project: node 1 ux uy uz urx ury urz,
+** then node 2, node 3, node 4.
+**
+*NODE
+1, 0.0, 0.0, 0.0
+2, 1.0, 0.0, 0.0
+3, 1.0, 1.0, 0.0
+4, 0.0, 1.0, 0.0
+*ELEMENT, TYPE=S4, ELSET=EALL
+1, 1, 2, 3, 4
+*MATERIAL, NAME=STEEL
+*ELASTIC
+210000000000.0, 0.3
+*SHELL SECTION, ELSET=EALL, MATERIAL=STEEL
+0.01
+**
+** Matrix generation step. Abaqus writes an .mtx file next to the job files.
+**
+*STEP, NAME=EXPORT_STIFFNESS
+*MATRIX GENERATE, STIFFNESS
+*MATRIX OUTPUT, STIFFNESS, FORMAT=COORDINATE
+*END STEP
+

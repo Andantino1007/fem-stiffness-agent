@@ -1,0 +1,409 @@
+# 需求2：壳单元刚度矩阵优化技术路线与待讨论口径
+
+整理日期：2026-07-07
+
+## 目标
+
+以多 agent 协作形式完成壳单元刚度矩阵优化。核心交付是：用 C++ 生成四节点壳单元 24 x 24 单元刚度矩阵，并用 Catch2 单元测试验证其与 Abaqus 导出的单元刚度矩阵相对误差小于 1%。
+
+本需求有两个交付面：
+
+- 技术输出件：C++ 壳单元刚度矩阵组装代码、Abaqus 基准数据读取、误差计算、Catch2 单元测试。
+- 协同输出件：多 agent 角色定义、任务边界、交接物、验收流程。
+
+## 已有参考资料判断
+
+项目参考资料中已有一套 Shell203 相关代码片段和 Shell181 理论资料。Shell203 的说明中明确写到：一阶对标 ANSYS SHELL181，二阶对标 ANSYS SHELL281。现有代码已经包含刚度矩阵组装主流程、MITC 剪切独立插值、位移不相容模式、drill 自由度罚刚度、Catch2 测试样例和两组 24 x 24 基准矩阵。
+
+因此建议技术路线不是从零实现壳单元，而是以 Shell203 参考实现为基础，抽取成可独立编译、可测试、可对标 Abaqus 的最小工程。
+
+## 总体技术路线
+
+### 阶段 1：明确对标口径
+
+先确定 Abaqus 基准数据如何生成，否则后续误差超过 1% 时无法判断是代码错误还是口径不一致。
+
+需要明确：
+
+- Abaqus 壳单元类型：S4、S4R 或其他四节点壳单元。
+- 单元自由度顺序：建议统一为每节点 `Ux Uy Uz Rx Ry Rz`，四节点合计 24 自由度。
+- 节点编号顺序：必须与 C++ 输入顺序一致，建议采用逆时针四节点顺序。
+- 材料模型：先只做各向同性线弹性材料，参数为 `E` 和 `nu`。
+- 截面：先只做均匀厚度壳截面。
+- 积分设置：明确面内积分、厚度方向积分点数、是否减缩积分。
+- 局部坐标和法向：明确 Abaqus 中法向、局部坐标和 C++ director vector 的对应关系。
+- 输出矩阵格式：建议导出 CSV 或 MatrixMarket，统一为 24 行 24 列。
+
+### 阶段 2：搭建 C++ 最小工程
+
+将参考代码整理为可独立编译的最小版本，优先实现单刚计算，而不是完整有限元系统。
+
+建议核心模块：
+
+- `ShellElementInput`：节点坐标、材料、厚度、积分点数、单元选项。
+- `Matrix24`：24 x 24 矩阵类型和基础运算。
+- `Shell203Element`：壳单元刚度矩阵计算入口。
+- `AbaqusMatrixReader`：读取 Abaqus 导出的 24 x 24 单刚。
+- `MatrixCompare`：计算 Frobenius 相对误差和最大逐项误差。
+
+最小 API 建议：
+
+```cpp
+Matrix24 computeShellElementStiffness(const ShellElementInput& input);
+Matrix24 readAbaqusMatrix(const std::filesystem::path& path);
+MatrixError compareMatrix(const Matrix24& actual, const Matrix24& expected);
+```
+
+### 阶段 3：复用 Shell203 理论实现
+
+现有 Shell203 参考实现中的关键算法应该保留：
+
+- 四节点壳单元，每节点 6 自由度，输出 24 x 24 刚度矩阵。
+- 实际物理刚度主要来自 5 个自由度，第 6 个 drill 自由度通过罚刚度处理。
+- 面内采用 2 x 2 Gauss 积分。
+- 厚度方向积分点支持 1、3、5、7、9，默认建议先使用 3。
+- 应变位移矩阵 `B` 用于 `K = integral(B^T D B)`。
+- MITC 方法对横向剪切应变做独立插值，避免剪切锁死。
+- 位移不相容模式用 `K_new = K - E^T H^-1 E` 修正。
+- drill 自由度采用积分罚项，参考罚参数 `alpha = 0.0085`。
+- 坐标变换要区分全局坐标、单元局部正交坐标、曲线坐标。
+
+### 阶段 4：生成 Abaqus 基准数据
+
+先从小样本开始：
+
+- 第 1 组：平面四边形单元。
+- 第 2 组：斜平面四边形单元。
+- 第 3 组：轻微扭曲四边形单元。
+- 第 4 组以后：随机生成合理几何、厚度和材料参数。
+
+建议路径：
+
+```text
+data/abaqus/input/
+data/abaqus/matrix/
+data/abaqus/meta/
+```
+
+每个样本至少保存：
+
+- 节点坐标。
+- 节点编号顺序。
+- 材料参数 `E`、`nu`。
+- 厚度。
+- Abaqus 单元类型和关键选项。
+- Abaqus 导出的 24 x 24 单刚。
+- C++ 计算出的 24 x 24 单刚。
+- 误差报告。
+
+### 阶段 5：Catch2 测试
+
+测试分三层：
+
+- 基础性质测试：矩阵维度为 24 x 24；矩阵基本对称；非法厚度、非法材料参数能报错。
+- 理论回归测试：复用现有 Shell203 测试中的两组 24 x 24 基准矩阵，保证迁移过程中不破坏原逻辑。
+- Abaqus 对标测试：读取 Abaqus 基准矩阵，验证相对误差小于 1%。
+
+误差函数建议：
+
+```text
+relative_frobenius_error = norm(K_cpp - K_abaqus) / norm(K_abaqus)
+max_abs_error = max(abs(K_cpp - K_abaqus))
+max_relative_entry_error = max(abs(K_cpp - K_abaqus) / max(abs(K_abaqus), eps))
+```
+
+主验收指标建议使用 Frobenius 相对误差小于 1%。逐项最大相对误差可作为辅助诊断指标，因为接近零的矩阵项容易放大相对误差。
+
+## 多 agent 协同方案
+
+### 理论研究 Agent
+
+职责：
+
+- 研究 ANSYS SHELL181 理论资料。
+- 梳理自由度、形函数、局部坐标、director vector、剪切修正、drill 刚度。
+- 明确 Shell203 实现与理论文档的对应关系。
+- 记录 Abaqus 和 ANSYS 壳单元差异可能带来的误差来源。
+
+输入：
+
+- Shell181 理论 PDF。
+- ANSYS SHELL181 调研文档。
+- Shell203 参考代码。
+
+输出：
+
+- `docs/theory/shell181-notes.md`
+- `docs/theory/shell203-implementation-map.md`
+- 待确认理论口径清单。
+
+### Abaqus 数据 Agent
+
+职责：
+
+- 生成 X 个 Abaqus 壳单元算例。
+- 导出每个单元的 24 x 24 单刚。
+- 固化 Abaqus 数据格式、单位制、自由度顺序和样本元数据。
+
+输入：
+
+- 样本生成规则。
+- 单元类型和 Abaqus 选项。
+- 材料和厚度参数范围。
+
+输出：
+
+- Abaqus `.inp` 文件。
+- 单刚矩阵文件。
+- 样本元数据文件。
+- Abaqus 数据生成说明。
+
+### C++ 开发 Agent
+
+职责：
+
+- 整理 Shell203 参考代码为最小可编译工程。
+- 实现用户输入到 24 x 24 单刚矩阵的接口。
+- 实现 Abaqus 矩阵读取和误差计算。
+- 保证代码结构清晰，方便测试 Agent 调用。
+
+输入：
+
+- Shell203 参考实现。
+- 理论 Agent 的公式和实现映射。
+- Abaqus 数据 Agent 的样本格式。
+
+输出：
+
+- C++ 源码。
+- 头文件和接口说明。
+- 示例输入输出。
+
+### 测试 Agent
+
+职责：
+
+- 使用 Catch2 编写单元测试。
+- 验证矩阵基本性质和异常输入。
+- 验证 Shell203 参考矩阵回归测试。
+- 验证 C++ 输出与 Abaqus 单刚误差小于 1%。
+
+输入：
+
+- C++ 开发 Agent 的接口。
+- Abaqus 基准矩阵。
+- 验收指标。
+
+输出：
+
+- Catch2 测试代码。
+- 测试报告。
+- 误差统计表。
+
+### 集成协调 Agent
+
+职责：
+
+- 管理任务拆解、目录结构、接口协议和最终交付。
+- 维护 README 和多 agent 协同说明。
+- 汇总未决问题，推动口径确认。
+
+输出：
+
+- `README.md`
+- `docs/agents/role-definitions.md`
+- `docs/verification/acceptance-report.md`
+
+## 推荐目录结构
+
+```text
+.
+├── CMakeLists.txt
+├── README.md
+├── docs/
+│   ├── agents/
+│   │   └── role-definitions.md
+│   ├── requirements/
+│   │   └── requirement-2-technical-route.md
+│   ├── theory/
+│   │   ├── shell181-notes.md
+│   │   └── shell203-implementation-map.md
+│   └── verification/
+│       ├── abaqus-baseline-plan.md
+│       └── acceptance-report.md
+├── include/
+│   └── shell/
+├── src/
+│   └── shell/
+├── tests/
+│   ├── catch/
+│   └── shell203_tests.cpp
+└── data/
+    └── abaqus/
+        ├── input/
+        ├── matrix/
+        └── meta/
+```
+
+## 当前待讨论确定的口径
+
+### 1. X 的取值
+
+待确认：最终需要多少个壳单元样本。
+
+建议：
+
+- 开发阶段先用 `X = 2`。
+- 小规模验证用 `X = 10`。
+- 最终验收可用 `X = 100`。
+
+### 2. Abaqus 单元类型
+
+待确认：Abaqus 使用哪种壳单元作为基准。
+
+必须明确：
+
+- 使用 `S4` 还是 `S4R`。
+- 是否开启减缩积分或沙漏控制。
+- 是否采用默认 drilling stiffness。
+- 是否输出的是元素局部坐标下矩阵还是全局自由度矩阵。
+
+风险：
+
+Shell203 是参考 ANSYS SHELL181 的实现，Abaqus 壳单元与 ANSYS 壳单元在剪切修正、drill 刚度、局部坐标、沙漏控制上可能不同。如果 Abaqus 口径不对齐，1% 误差目标可能不成立。
+
+### 3. 自由度排序
+
+待确认：24 x 24 矩阵的自由度顺序。
+
+建议统一为：
+
+```text
+node1: Ux Uy Uz Rx Ry Rz
+node2: Ux Uy Uz Rx Ry Rz
+node3: Ux Uy Uz Rx Ry Rz
+node4: Ux Uy Uz Rx Ry Rz
+```
+
+### 4. 节点顺序
+
+待确认：Abaqus 和 C++ 是否使用完全一致的四节点顺序。
+
+建议：
+
+- 使用逆时针节点顺序。
+- 每个样本的元数据里显式保存节点编号和坐标。
+- 对比前先检查节点顺序，不一致时禁止直接比较矩阵。
+
+### 5. 局部坐标和 director vector
+
+待确认：
+
+- Abaqus 是否显式指定壳单元法向或局部坐标。
+- 如果未指定，Abaqus 和 C++ 是否采用一致的自动法向算法。
+- 是否需要在 C++ 输入中支持用户给定 director vector。
+
+风险：
+
+局部坐标和法向不同会导致旋转自由度耦合项不同，矩阵看起来差异很大。
+
+### 6. 厚度方向积分点
+
+待确认：厚度方向积分点数。
+
+建议先统一为 3 点，因为参考代码默认是 3，ANSYS SHELL181 文档中默认每层也常用 3 点。
+
+### 7. 剪切修正系数 kappa
+
+待确认：
+
+- 是否沿用参考代码中的经验公式。
+- 是否需要对齐 Abaqus 的剪切修正策略。
+
+风险：
+
+剪切修正会影响横向剪切刚度，薄壳或畸变单元中差异可能明显。
+
+### 8. drill 自由度罚刚度
+
+待确认：
+
+- C++ 是否沿用 `alpha = 0.0085`。
+- Abaqus 的 drilling stiffness 是否可配置或可查询。
+- 是否将 drill 自由度项纳入 1% 总体误差。
+
+风险：
+
+第 6 个自由度不是标准物理刚度，主要靠罚刚度稳定矩阵。不同软件的处理方式可能不同。
+
+### 9. 误差指标
+
+待确认：最终验收只看 Frobenius 相对误差，还是同时看逐项误差。
+
+建议：
+
+- 主指标：Frobenius 相对误差小于 1%。
+- 辅助指标：最大绝对误差、最大逐项相对误差、对称性误差。
+- 对接近零的矩阵项，不建议单独用逐项相对误差作为硬指标。
+
+### 10. 交付形式
+
+待确认最终交付是：
+
+- 只交源码和测试；
+- 交一个命令行程序；
+- 交一个库接口；
+- 交完整 README、测试报告和多 agent 协同文档。
+
+建议最小交付：
+
+```text
+shell_stiffness_cli --input sample.json --abaqus abaqus_matrix.csv --report report.json
+```
+
+## 推荐最小里程碑
+
+### M1：文档和口径确认
+
+完成：
+
+- 技术路线文档。
+- 多 agent 角色定义。
+- Abaqus 基准生成方案。
+- 待确认口径清单。
+
+### M2：C++ 最小原型
+
+完成：
+
+- 输入 4 节点坐标、材料参数、厚度。
+- 输出 24 x 24 单刚。
+- 通过现有 Shell203 参考矩阵回归测试。
+
+### M3：Abaqus 对标
+
+完成：
+
+- 读取 Abaqus 24 x 24 单刚。
+- 对比 C++ 和 Abaqus 误差。
+- 至少 2 个样本误差小于 1%。
+
+### M4：扩展到 X 个样本
+
+完成：
+
+- 批量读取 X 个 Abaqus 样本。
+- 输出误差统计。
+- 生成最终验收报告。
+
+## 下一步建议
+
+优先讨论并确认以下 5 个问题：
+
+1. `X` 最终取多少，是否先按 100 个准备。
+2. Abaqus 基准使用 `S4` 还是 `S4R`。
+3. Abaqus 单刚矩阵如何导出，最终文件格式用 CSV 还是 MatrixMarket。
+4. 是否要求 C++ 完全独立运行，还是允许依赖现有 BEF 框架。
+5. 1% 误差是对每个样本的 Frobenius 相对误差，还是对矩阵每个元素逐项比较。
+
+确认这 5 个问题后，就可以进入代码整理和测试开发。

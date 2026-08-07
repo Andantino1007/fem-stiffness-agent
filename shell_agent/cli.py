@@ -1,0 +1,93 @@
+"""项目统一 Python 命令行入口。"""
+
+from __future__ import annotations
+
+import argparse
+import subprocess
+import sys
+from pathlib import Path
+
+from .api_check import perform_api_check, print_api_check
+from .verification import DEFAULT_REPORT, ROOT, run_verification
+
+
+SCRIPTS_DIR = ROOT / "scripts"
+
+
+def load_langgraph_main():
+    if str(SCRIPTS_DIR) not in sys.path:
+        sys.path.insert(0, str(SCRIPTS_DIR))
+    from graph import main as langgraph_main
+
+    return langgraph_main
+
+
+def run_legacy(arguments: list[str]) -> int:
+    command = [sys.executable, str(SCRIPTS_DIR / "agents.py"), *arguments]
+    return subprocess.run(command, cwd=ROOT, check=False).returncode
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="python -m shell_agent",
+        description="需求2壳单元刚度矩阵多 Agent 工作流。",
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    verify = subparsers.add_parser("verify", help="编译 C++、生成矩阵并运行 Catch2。")
+    verify.add_argument(
+        "--report",
+        type=Path,
+        default=DEFAULT_REPORT.relative_to(ROOT),
+        help="验证报告路径。",
+    )
+
+    subparsers.add_parser("check", help="检查 LangGraph 环境，不调用 API。")
+    subparsers.add_parser("api-check", help="发送最小在线请求，检查 API、模型和网关。")
+
+    run = subparsers.add_parser("run", help="启动 LangGraph 多 Agent 数值迭代。")
+    run.add_argument("--max-iterations", type=int, default=3)
+    run.add_argument("--target-error", type=float, default=0.01)
+
+    resume = subparsers.add_parser("resume", help="从 SQLite checkpoint 恢复。")
+    resume.add_argument("run_id")
+
+    legacy = subparsers.add_parser("legacy", help="运行原手写编排。")
+    legacy.add_argument("--max-iterations", type=int, default=3)
+    legacy.add_argument("--target-error", type=float, default=0.01)
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+
+    if args.command == "verify":
+        return run_verification(args.report)
+    if args.command == "check":
+        return load_langgraph_main()(["--check"])
+    if args.command == "api-check":
+        print_api_check(perform_api_check())
+        return 0
+    if args.command == "run":
+        return load_langgraph_main()(
+            [
+                "--max-iterations",
+                str(args.max_iterations),
+                "--target-error",
+                str(args.target_error),
+            ]
+        )
+    if args.command == "resume":
+        return load_langgraph_main()(["--resume", args.run_id])
+    if args.command == "legacy":
+        return run_legacy(
+            [
+                "--max-iterations",
+                str(args.max_iterations),
+                "--target-error",
+                str(args.target_error),
+            ]
+        )
+    parser.error(f"未知命令：{args.command}")
+    return 64
