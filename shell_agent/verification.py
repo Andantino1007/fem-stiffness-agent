@@ -57,10 +57,9 @@ def compiler_flags() -> list[str]:
     return flags
 
 
-def run_verification(report_path: Path = DEFAULT_REPORT) -> int:
-    """编译并运行矩阵 CLI 和 Catch2，返回进程退出码。"""
+def compile_verification_binaries() -> tuple[int, Path, Path]:
+    """编译矩阵 CLI 和 Catch2 测试程序。"""
     BUILD_DIR.mkdir(parents=True, exist_ok=True)
-    report_path = report_path if report_path.is_absolute() else ROOT / report_path
     cli_path = executable_path("shell_stiffness_cli")
     tests_path = executable_path("shell_stiffness_tests")
     compiler = compiler_command()
@@ -77,17 +76,7 @@ def run_verification(report_path: Path = DEFAULT_REPORT) -> int:
     ]
     code = run_checked(compile_cli)
     if code != 0:
-        return code
-
-    code = run_checked(
-        [
-            str(cli_path),
-            str(SAMPLE_PATH.relative_to(ROOT)),
-            str(report_path.relative_to(ROOT)),
-        ]
-    )
-    if code != 0:
-        return code
+        return code, cli_path, tests_path
 
     compile_tests = [
         *compiler,
@@ -100,6 +89,23 @@ def run_verification(report_path: Path = DEFAULT_REPORT) -> int:
         str(tests_path.relative_to(ROOT)),
     ]
     code = run_checked(compile_tests)
+    return code, cli_path, tests_path
+
+
+def run_verification(report_path: Path = DEFAULT_REPORT) -> int:
+    """编译并运行矩阵 CLI 和 Catch2，返回进程退出码。"""
+    code, cli_path, tests_path = compile_verification_binaries()
+    if code != 0:
+        return code
+    report_path = report_path if report_path.is_absolute() else ROOT / report_path
+
+    code = run_checked(
+        [
+            str(cli_path),
+            str(SAMPLE_PATH.relative_to(ROOT)),
+            str(report_path.relative_to(ROOT)),
+        ]
+    )
     if code != 0:
         return code
 

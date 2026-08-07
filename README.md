@@ -146,6 +146,20 @@ OPENAI_REASONING_EFFORT=low
 python -m shell_agent verify
 ```
 
+批量验证训练集和测试集：
+
+```bash
+python -m shell_agent verify-dataset
+```
+
+最终验收时要求测试集至少包含一个独立 Abaqus 基准：
+
+```bash
+python -m shell_agent verify-dataset --require-test
+```
+
+数据集划分位于 `data/datasets/shell_stiffness.json`。训练集用于迭代诊断，测试集用于泛化检查；同一样本禁止同时出现在两个集合中。
+
 2. 检查真实 API：
 
 ```bash

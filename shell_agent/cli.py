@@ -9,6 +9,7 @@ from pathlib import Path
 
 from .api_check import perform_api_check, print_api_check
 from .verification import DEFAULT_REPORT, ROOT, run_verification
+from .dataset_verification import DEFAULT_DATASET, DEFAULT_DATASET_RESULT, run_dataset_verification
 
 
 SCRIPTS_DIR = ROOT / "scripts"
@@ -42,6 +43,19 @@ def build_parser() -> argparse.ArgumentParser:
         help="验证报告路径。",
     )
 
+    verify_dataset = subparsers.add_parser(
+        "verify-dataset", help="编译一次并验证训练集和测试集。"
+    )
+    verify_dataset.add_argument(
+        "--dataset", type=Path, default=DEFAULT_DATASET.relative_to(ROOT)
+    )
+    verify_dataset.add_argument(
+        "--result", type=Path, default=DEFAULT_DATASET_RESULT.relative_to(ROOT)
+    )
+    verify_dataset.add_argument(
+        "--require-test", action="store_true", help="测试集为空时返回失败。"
+    )
+
     subparsers.add_parser("check", help="检查 LangGraph 环境，不调用 API。")
     subparsers.add_parser("api-check", help="发送最小在线请求，检查 API、模型和网关。")
 
@@ -64,6 +78,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "verify":
         return run_verification(args.report)
+    if args.command == "verify-dataset":
+        return run_dataset_verification(args.dataset, args.result, args.require_test)
     if args.command == "check":
         return load_langgraph_main()(["--check"])
     if args.command == "api-check":

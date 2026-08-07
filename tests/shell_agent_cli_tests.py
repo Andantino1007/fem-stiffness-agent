@@ -9,6 +9,7 @@ from unittest.mock import patch
 from shell_agent.api_check import perform_api_check
 from shell_agent.cli import build_parser
 from shell_agent.verification import run_verification
+from shell_agent.dataset_verification import load_dataset, summarize_split
 
 
 class ShellAgentCliTests(unittest.TestCase):
@@ -25,6 +26,10 @@ class ShellAgentCliTests(unittest.TestCase):
 
         api_check = parser.parse_args(["api-check"])
         self.assertEqual(api_check.command, "api-check")
+
+        dataset = parser.parse_args(["verify-dataset", "--require-test"])
+        self.assertEqual(dataset.command, "verify-dataset")
+        self.assertTrue(dataset.require_test)
 
     @patch("shell_agent.verification.run_checked", side_effect=[0, 0, 0, 0])
     def test_verification_driver_uses_four_direct_process_calls(self, mocked_run) -> None:
@@ -46,6 +51,12 @@ class ShellAgentCliTests(unittest.TestCase):
         self.assertEqual(result["model"], "test-model")
         self.assertEqual(result["response_preview"], "API_OK")
         mocked_call.assert_called_once()
+
+    def test_dataset_manifest_has_disjoint_train_and_test_splits(self) -> None:
+        dataset = load_dataset()
+        self.assertTrue(dataset["train"])
+        self.assertFalse(set(dataset["train"]) & set(dataset["test"]))
+        self.assertFalse(summarize_split([])["ready"])
 
 
 if __name__ == "__main__":

@@ -6,6 +6,7 @@
 
 ```bash
 python -m shell_agent verify
+python -m shell_agent verify-dataset
 python -m shell_agent check
 python -m shell_agent api-check
 python -m shell_agent run --max-iterations 3 --target-error 0.01

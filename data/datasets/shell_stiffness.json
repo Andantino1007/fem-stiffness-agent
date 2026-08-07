@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "description": "Abaqus S4 壳单元刚度矩阵训练/测试划分",
+  "train": [
+    "data/abaqus/meta/sample_001.json"
+  ],
+  "test": []
+}

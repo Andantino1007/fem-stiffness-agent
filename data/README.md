@@ -6,6 +6,7 @@
 
 ```text
 data/
+├── datasets/               训练集/测试集划分清单
 ├── abaqus/
 │   ├── input/      Abaqus 输入文件
 │   ├── matrix/     Abaqus 导出的 24 x 24 基准矩阵
@@ -47,3 +48,7 @@ data/cpp/<sample_id>_cpp.csv
 新增样本时依次覆盖：平面规则四边形、斜平面四边形、轻微扭曲四边形、厚度变化、材料参数变化。先保证单个样本可复现，再扩展到批量 `X` 个样本。
 
 不得仅替换 CSV 而不更新元数据，否则误差结果无法追溯。
+
+## 训练集与测试集
+
+划分清单位于 `data/datasets/shell_stiffness.json`。训练集用于 Agent 数值迭代，测试集只用于泛化检查和最终验收。同一样本禁止同时进入两个集合。
