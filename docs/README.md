@@ -1,22 +1,22 @@
-# docs
+# 文档目录
 
 本目录是需求2技术文档入口。
 
-## `requirements/`
+## 需求与理论文档
 
 - `requirement-2-technical-route.md`：整体技术路线。
 - `requirement-2-current-plan-for-discussion.md`：老师讨论方案。
 - `requirement-2-abaqus-s4-theory-baseline.md`：S4 理论口径。
 
-## `agents/`
+## 智能体文档
 
 - `role-definitions.md`：角色定义。
 
-## `abaqus/`
+## Abaqus 文档
 
 - `export-s4-stiffness.md`：S4 刚度矩阵导出流程。
 
-## `verification/`
+## 验证文档
 
 - `sample-001-report.md`：当前数值验证报告。
 

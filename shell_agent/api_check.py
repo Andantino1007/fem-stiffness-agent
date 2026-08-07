@@ -1,4 +1,4 @@
-"""OpenAI 兼容 API 的最小在线连通性检查。"""
+"""OpenAI 兼容接口的最小在线连通性检查。"""
 
 from __future__ import annotations
 

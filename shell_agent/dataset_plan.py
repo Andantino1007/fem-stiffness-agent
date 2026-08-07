@@ -1,4 +1,4 @@
-"""Dataset Planner 结构化计划的确定性校验。"""
+"""数据集规划智能体结构化计划的确定性校验。"""
 
 from __future__ import annotations
 

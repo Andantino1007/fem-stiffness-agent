@@ -1,49 +1,27 @@
-# Agent 提示词
+# 智能体提示词
 
-本目录保存在线 LLM Agent 的提示词。历史验收提示词位于根目录，当前正式迭代提示词位于 `workflow/`。运行时由 Python 编排器读取。
+本目录中的提示词全部使用中文说明，程序要求的 JSON 字段名和统一差异协议保持英文标识，以保证机器解析稳定。
 
-## 文件规则
+## 数值优化提示词
 
-每个角色由一对 Markdown 文件组成：
-
-- `<role>.system.md`：角色定位、职责边界、可靠性要求。
-- `<role>.user.md`：当前任务和输出格式。
-
-当前角色：
-
-| 角色 | System Prompt | User Prompt |
+| 角色 | 系统提示词 | 用户提示词 |
 | --- | --- | --- |
-| 理论研究 | `theory-research.system.md` | `theory-research.user.md` |
-| C++ 开发 | `developer.system.md` | `developer.user.md` |
-| 综合评审 | `reviewer.system.md` | `reviewer.user.md` |
+| 实验规划智能体 | `workflow/planner.system.md` | `workflow/planner.user.md` |
+| 理论研究智能体 | `workflow/theory.system.md` | `workflow/theory.user.md` |
+| 开发智能体 | `workflow/developer.system.md` | `workflow/developer.user.md` |
+| 评审智能体 | `workflow/reviewer.system.md` | `workflow/reviewer.user.md` |
 
-正式迭代角色：
+## 数据生成提示词
 
-| 角色 | System Prompt | User Prompt |
-| --- | --- | --- |
-| 实验规划 | `workflow/planner.system.md` | `workflow/planner.user.md` |
-| 理论研究 | `workflow/theory.system.md` | `workflow/theory.user.md` |
-| C++ 开发 | `workflow/developer.system.md` | `workflow/developer.user.md` |
-| 数值评审 | `workflow/reviewer.system.md` | `workflow/reviewer.user.md` |
+| 角色 | 系统提示词 |
+| --- | --- |
+| 数据集规划智能体 | `dataset/planner.system.md` |
+| Abaqus 数据智能体 | `dataset/data-agent.system.md` |
+| 数据集校验智能体 | `dataset/validator.system.md` |
 
-Experiment Planner 输出结构化 JSON，限定本轮 `experiment_class`、目标矩阵块、允许修改项、禁止修改项和预期指标。Theory 与 Developer 必须遵守该计划。
+## 维护要求
 
-Plan 各字段的详细含义、验证边界和运行产物位置见上一级 [agents README](../README.md#experiment-plan)。
-
-## 运行时上下文
-
-每个 `*.user.md` 必须保留：
-
-```text
-{{CONTEXT}}
-```
-
-工作流会把共享状态、代码片段、报告和日志插入该位置。上下文来源由 Python 编排代码控制，提示词只负责解释任务和约束输出。
-
-## 修改要求
-
-- 使用中文 Markdown。
-- 任务要求要具体、可检查，避免泛泛地要求“分析一下”。
-- 不要求或泄露模型隐藏推理，只使用模型返回的可见分析结果。
-- 不编造 Abaqus 内部算法、项目文件或测试结论。
-- 修改后先运行 `python -m shell_agent check` 和 Python 单元测试，再运行对应在线阶段检查输出。
+- 普通说明、约束、风险和输出要求使用中文；
+- 不翻译程序依赖的 JSON 键、文件路径、命令和协议标记；
+- 修改提示词后运行全部 Python 测试；
+- 不允许通过提示词放宽本地测试、矩阵来源或数值接受门槛。

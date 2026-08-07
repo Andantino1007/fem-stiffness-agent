@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""使用 LangGraph 编排在线多 Agent 数值迭代。"""
+"""使用 LangGraph 编排在线多智能体数值迭代。"""
 
 from __future__ import annotations
 
@@ -287,7 +287,7 @@ def duplicate_gate_node(state: GraphState) -> dict[str, Any]:
 
 
 def duplicate_reject_node(state: GraphState) -> dict[str, Any]:
-    """连续重复达到上限时本地拒绝，避免浪费 Test 和 Reviewer API。"""
+    """连续重复达到上限时本地拒绝，避免浪费测试与评审接口调用。"""
     iteration = dict(state["iteration"])
     matches = iteration.get("duplicate_matches", [])
     message = (

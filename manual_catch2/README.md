@@ -26,7 +26,7 @@ cd manual_catch2
 c++ --version
 ```
 
-macOS 通常使用 Apple Clang。如果提示找不到命令，可先安装 Xcode Command Line Tools：
+macOS 通常使用苹果 Clang 编译器。如果提示找不到命令，可先安装 Xcode 命令行工具：
 
 ```bash
 xcode-select --install
@@ -75,7 +75,7 @@ make test
 正常结果应类似：
 
 ```text
-All tests passed (43 assertions in 6 test cases)
+全部测试通过（6个测试用例，共43个断言）
 ```
 
 `make test` 会先判断源码是否比测试程序新。如果源码修改过，它会自动重新编译。

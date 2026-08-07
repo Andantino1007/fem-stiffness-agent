@@ -1,4 +1,4 @@
-# data
+# 数据目录
 
 本目录保存需求2的样本输入、Abaqus 基准矩阵、样本元数据和 C++ 输出矩阵。所有数值对比都应以这里的样本契约为准。
 
@@ -6,7 +6,7 @@
 
 ```text
 data/
-├── datasets/               训练集/测试集划分清单
+├── datasets/               训练集、验证集和测试集划分清单
 ├── abaqus/
 │   ├── input/      Abaqus 输入文件
 │   ├── matrix/     Abaqus 导出的 24 x 24 基准矩阵
@@ -49,6 +49,6 @@ data/cpp/<sample_id>_cpp.csv
 
 不得仅替换 CSV 而不更新元数据，否则误差结果无法追溯。
 
-## 训练集与测试集
+## 训练集、验证集与测试集
 
-划分清单位于 `data/datasets/shell_stiffness.json`。训练集用于 Agent 数值迭代，测试集只用于泛化检查和最终验收。同一样本禁止同时进入两个集合。
+划分清单位于 `data/datasets/shell_stiffness.json`。训练集用于智能体数值迭代，验证集用于候选筛选，锁定测试集只用于最终泛化验收。同一样本禁止同时进入多个集合。

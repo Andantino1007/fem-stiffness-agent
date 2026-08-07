@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""统一 Python CLI 与验证驱动的离线测试。"""
+"""统一 Python 命令行与验证驱动的离线测试。"""
 
 from __future__ import annotations
 

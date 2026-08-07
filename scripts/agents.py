@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""正式多 Agent 数值迭代闭环。"""
+"""正式多智能体数值迭代闭环。"""
 
 from __future__ import annotations
 
@@ -415,7 +415,7 @@ def compare_expected_metrics(
     baseline: dict[str, Any],
     candidate: dict[str, Any],
 ) -> dict[str, dict[str, float | bool]]:
-    """按 Planner 声明的稳定指标键生成候选前后对比。"""
+    """按规划智能体声明的稳定指标键生成候选前后对比。"""
     baseline_values = {
         **baseline.get("metrics", {}),
         **baseline.get("diagnostics", {}).get("block_relative_errors", {}),
@@ -451,7 +451,7 @@ def evaluate_candidate_gate(
     primary_metric: str,
     test_passed: bool,
 ) -> dict[str, Any]:
-    """执行不受 Agent 控制的本地数值接受门槛。"""
+    """执行不受智能体控制的本地数值接受门槛。"""
     before_metrics = baseline.get("metrics", {})
     after_metrics = candidate.get("metrics", {})
     before_blocks = baseline.get("diagnostics", {}).get("block_relative_errors", {})
@@ -651,7 +651,7 @@ def extract_json_object(text: str) -> dict[str, Any]:
 
 
 def validate_experiment_plan(plan: dict[str, Any]) -> dict[str, Any]:
-    """校验 Planner 的结构化输出，避免下游依赖模糊文本。"""
+    """校验规划智能体的结构化输出，避免下游依赖模糊文本。"""
     required_strings = {
         "hypothesis_id",
         "experiment_class",

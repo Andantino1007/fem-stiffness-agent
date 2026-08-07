@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""多 Agent 工作流使用的轻量 OpenAI 兼容 API 客户端。
+"""多智能体工作流使用的轻量 OpenAI 兼容接口客户端。
 
 模块支持 Responses API 和 Chat Completions API，仅依赖 Python 标准库，
 因此在 PC 或 Mac 上运行工作流前无需额外安装依赖。

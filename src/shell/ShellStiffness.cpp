@@ -239,7 +239,7 @@ ShellStiffnessComponents computeLocalComponents(const ShellElementInput& input, 
         input.youngModulus * std::pow(input.thickness, 3) / (12.0 * elasticDenominator), input.poissonRatio);
     const double shearModulus = input.youngModulus / (2.0 * (1.0 + input.poissonRatio));
     Matrix2 shearMaterial{};
-    // Abaqus S4 对齐：仅降低横向剪切 gamma_xz/gamma_yz 的有效本构刚度。
+    // Abaqus S4 对齐：仅降低两个横向剪切应变分量的有效本构刚度。
     const double transverseShearStiffness = (2.0 / 3.0) * kShearCorrection * shearModulus * input.thickness;
     shearMaterial[0][0] = transverseShearStiffness;
     shearMaterial[1][1] = transverseShearStiffness;
@@ -269,7 +269,7 @@ ShellStiffnessComponents computeLocalComponents(const ShellElementInput& input, 
             bendingB[2][base + 3] = -shape.dNdx[node];
             bendingB[2][base + 4] = shape.dNdy[node];
         }
-        // 膜内 assumed-strain：仅投影 gamma_xy 的寄生双线性扰动，保留 eps_x/eps_y 基本拉伸项。
+        // 膜内假定应变：仅投影面内剪切应变的寄生双线性扰动，保留两个正应变基本拉伸项。
         for (std::size_t node = 0; node < kNodeCount; ++node) {
             const std::size_t base = node * kDofPerNode;
             membraneB[2][base] = membraneAssumed.dNdy[node];
@@ -281,7 +281,7 @@ ShellStiffnessComponents computeLocalComponents(const ShellElementInput& input, 
             components.drilling, shape, kDrillingPenalty * shearModulus * input.thickness * shape.detJ);
     }
 
-    // 横向剪切改用同一 shearB 的 2x2 积分，以保留 uz 相邻耦合结构。
+    // 横向剪切复用同一应变矩阵进行 2×2 积分，以保留横向位移的相邻耦合结构。
     for (const auto& point : integrationPoints) {
         const ShapeData shape = evaluateShape(geometry, point[0], point[1]);
         BMatrix2 shearB{};

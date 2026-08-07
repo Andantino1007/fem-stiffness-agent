@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Agent 迭代器的离线安全测试，不调用 API。"""
+"""智能体迭代器的离线安全测试，不调用在线接口。"""
 
 from __future__ import annotations
 

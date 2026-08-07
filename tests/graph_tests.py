@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""LangGraph 编排的离线测试，不调用 API。"""
+"""LangGraph 编排的离线测试，不调用在线接口。"""
 
 from __future__ import annotations
 
