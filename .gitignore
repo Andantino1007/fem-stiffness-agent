@@ -16,3 +16,9 @@ build/
 # LangGraph 本地 checkpoint
 workflow/checkpoints/*.sqlite
 workflow/checkpoints/*.sqlite-*
+
+# 本地运行审计记录（保留在磁盘，不纳入代码版本）
+workflow/runs/
+
+# 外部参考资料（保留在磁盘，不纳入代码版本）
+参考资料/
