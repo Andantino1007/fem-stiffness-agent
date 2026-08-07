@@ -32,6 +32,19 @@ LATEST_REPORT_PATH = ROOT / "docs" / "verification" / "agent-latest.md"
 EXPERIMENT_MEMORY_PATH = ROOT / "workflow" / "experiment-memory.json"
 
 ALLOWED_PATCH_PATHS = {"src/shell/ShellStiffness.cpp"}
+GLOBAL_METRIC_KEYS = {
+    "frobenius_relative_error",
+    "max_absolute_error",
+    "max_relative_entry_error",
+    "symmetry_error",
+}
+BLOCK_NAMES = {"membrane_xy", "bending_shear", "drilling"}
+BLOCK_METRIC_KEYS = {
+    f"{row_name}__{col_name}"
+    for row_name in BLOCK_NAMES
+    for col_name in BLOCK_NAMES
+}
+ALLOWED_EXPECTED_METRICS = GLOBAL_METRIC_KEYS | BLOCK_METRIC_KEYS
 BANNED_ADDED_TOKENS = {
     "system(",
     "popen(",
@@ -392,6 +405,41 @@ def matrix_diagnostics(actual_path: Path = CPP_MATRIX_PATH, expected_path: Path 
     return {"block_relative_errors": block_errors, "largest_absolute_entries": entries[:20]}
 
 
+def compare_expected_metrics(
+    expected_metrics: list[str],
+    baseline: dict[str, Any],
+    candidate: dict[str, Any],
+) -> dict[str, dict[str, float | bool]]:
+    """按 Planner 声明的稳定指标键生成候选前后对比。"""
+    baseline_values = {
+        **baseline.get("metrics", {}),
+        **baseline.get("diagnostics", {}).get("block_relative_errors", {}),
+    }
+    candidate_values = {
+        **candidate.get("metrics", {}),
+        **candidate.get("diagnostics", {}).get("block_relative_errors", {}),
+    }
+    missing = [
+        key
+        for key in expected_metrics
+        if key not in baseline_values or key not in candidate_values
+    ]
+    if missing:
+        raise ValueError(f"预期指标缺少实际数值：{missing}")
+
+    comparison: dict[str, dict[str, float | bool]] = {}
+    for key in expected_metrics:
+        before = float(baseline_values[key])
+        after = float(candidate_values[key])
+        comparison[key] = {
+            "before": before,
+            "after": after,
+            "delta": after - before,
+            "improved": after < before,
+        }
+    return comparison
+
+
 def run_verification(iteration_dir: Path, label: str) -> dict[str, Any]:
     log_path = iteration_dir / f"verification-{label}.log"
     report_mtime = REPORT_PATH.stat().st_mtime_ns if REPORT_PATH.exists() else None
@@ -525,6 +573,15 @@ def validate_experiment_plan(plan: dict[str, Any]) -> dict[str, Any]:
             isinstance(item, str) and item.strip() for item in value
         ):
             raise ValueError(f"Experiment Planner 字段 {key} 必须是非空字符串数组")
+    expected_metrics = plan["expected_metrics"]
+    if "frobenius_relative_error" not in expected_metrics:
+        raise ValueError("Experiment Planner 的 expected_metrics 必须包含 frobenius_relative_error")
+    invalid_metrics = sorted(set(expected_metrics) - ALLOWED_EXPECTED_METRICS)
+    if invalid_metrics:
+        raise ValueError(
+            "Experiment Planner 使用了未知 expected_metrics："
+            f"{invalid_metrics}；允许值：{sorted(ALLOWED_EXPECTED_METRICS)}"
+        )
     return plan
 
 

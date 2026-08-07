@@ -21,6 +21,7 @@ from agents import (
     SOURCE_PATH,
     apply_unified_diff,
     build_experiment_record,
+    compare_expected_metrics,
     console,
     developer_patch_with_retry,
     experiment_planner_agent,
@@ -341,9 +342,17 @@ def candidate_test_node(state: GraphState) -> dict[str, Any]:
         iteration["candidate_error"] = candidate["metrics"]["frobenius_relative_error"]
         iteration["candidate_metrics"] = candidate["metrics"]
         iteration["candidate_diagnostics"] = candidate.get("diagnostics", {})
+        iteration["expected_metric_comparison"] = compare_expected_metrics(
+            list(state["experiment_plan"]["expected_metrics"]),
+            state["current_verification"],
+            candidate,
+        )
+        iteration["expected_metrics_available"] = True
     else:
         iteration["candidate_error"] = None
         iteration["candidate_diagnostics"] = {}
+        iteration["expected_metric_comparison"] = {}
+        iteration["expected_metrics_available"] = False
     return {"iteration": iteration}
 
 
@@ -378,6 +387,7 @@ def decision_node(state: GraphState) -> dict[str, Any]:
     candidate_error = iteration.get("candidate_error")
     improved = bool(
         iteration.get("test_passed")
+        and iteration.get("expected_metrics_available")
         and candidate_error is not None
         and candidate_error < state["current_error"] - 1.0e-9
     )

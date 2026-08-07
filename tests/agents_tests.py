@@ -15,6 +15,7 @@ sys.path.insert(0, str(SCRIPTS_DIR))
 from agents import (
     agent_state_snapshot,
     build_experiment_record,
+    compare_expected_metrics,
     extract_json_object,
     extract_unified_diff,
     find_duplicate_patch,
@@ -113,6 +114,33 @@ END_UNIFIED_DIFF"""
         self.assertEqual(validate_experiment_plan(plan), plan)
         with self.assertRaises(ValueError):
             validate_experiment_plan({**plan, "experiment_class": "unknown"})
+        with self.assertRaises(ValueError):
+            validate_experiment_plan({**plan, "expected_metrics": ["unknown metric"]})
+        with self.assertRaises(ValueError):
+            validate_experiment_plan({**plan, "expected_metrics": ["symmetry_error"]})
+
+    def test_compares_declared_global_and_block_metrics(self) -> None:
+        baseline = {
+            "metrics": {"frobenius_relative_error": 0.10},
+            "diagnostics": {
+                "block_relative_errors": {"bending_shear__bending_shear": 0.30}
+            },
+        }
+        candidate = {
+            "metrics": {"frobenius_relative_error": 0.08},
+            "diagnostics": {
+                "block_relative_errors": {"bending_shear__bending_shear": 0.25}
+            },
+        }
+        comparison = compare_expected_metrics(
+            ["frobenius_relative_error", "bending_shear__bending_shear"],
+            baseline,
+            candidate,
+        )
+        self.assertTrue(comparison["frobenius_relative_error"]["improved"])
+        self.assertAlmostEqual(
+            comparison["bending_shear__bending_shear"]["delta"], -0.05
+        )
 
     def test_semantic_patch_fingerprint_ignores_comments_and_hunk_lines(self) -> None:
         first = """--- a/src/shell/ShellStiffness.cpp

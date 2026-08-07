@@ -11,7 +11,8 @@
 - 相近历史方案只有在存在新的数值或理论证据时才能重试，并必须明确实质差异。
 - `allowed_changes` 必须具体限定 Developer 可以修改的公式或代码范围。
 - `forbidden_changes` 必须包含本轮不可触碰的方向和已经失败的做法。
-- `expected_metrics` 必须包含 `frobenius_relative_error`，并列出用于判断该假设的分块指标。
+- `expected_metrics` 必须包含 `frobenius_relative_error`，并列出用于判断该假设的指标。
+- `expected_metrics` 只能使用以下精确键：`frobenius_relative_error`、`max_absolute_error`、`max_relative_entry_error`、`symmetry_error`、`membrane_xy__membrane_xy`、`membrane_xy__bending_shear`、`membrane_xy__drilling`、`bending_shear__membrane_xy`、`bending_shear__bending_shear`、`bending_shear__drilling`、`drilling__membrane_xy`、`drilling__bending_shear`、`drilling__drilling`。禁止在键中加入解释文字或自由度通道描述。
 
 只输出一个 JSON 对象，不要使用 Markdown 代码块：
 
