@@ -1,0 +1,26 @@
+{
+  "schema_version": 2,
+  "project_id": "abaqus-s4-stiffness",
+  "element_type": "Abaqus S4",
+  "batch_id": "s4-skew-validation-001",
+  "purpose": "用未参与训练的斜平行四边形检查 S4 刚度实现的几何泛化",
+  "split": "validation",
+  "selection_policy": "held_out_geometry",
+  "generation_method": "matrix_generate",
+  "samples": [
+    {
+      "sample_id": "s4_validation_001_skew",
+      "input_file": "data/abaqus/input/s4_validation_001_skew_matrix_export.inp",
+      "geometry_case": "skew_parallelogram",
+      "nodes": [[0.0, 0.0, 0.0], [2.5, 0.0, 0.0], [3.25, 1.25, 0.0], [0.75, 1.25, 0.0]],
+      "E": 210000000000.0,
+      "nu": 0.3,
+      "thickness": 0.01
+    }
+  ],
+  "forbidden_changes": [
+    "不得使用待评估实现结果作为参考矩阵",
+    "不得覆盖已有样本",
+    "不得生成没有可信来源记录的CSV"
+  ]
+}

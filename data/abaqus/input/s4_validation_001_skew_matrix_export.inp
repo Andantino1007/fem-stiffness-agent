@@ -1,0 +1,23 @@
+*HEADING
+s4_validation_001_skew: S4 stiffness matrix, skew parallelogram, validation split
+**
+** Node order: 1-2-3-4 counterclockwise
+** DOF order: ux uy uz urx ury urz for each node
+** Geometry: held-out planar skew parallelogram
+**
+*NODE
+1, 0.00, 0.00, 0.0
+2, 2.50, 0.00, 0.0
+3, 3.25, 1.25, 0.0
+4, 0.75, 1.25, 0.0
+*ELEMENT, TYPE=S4, ELSET=EALL
+1, 1, 2, 3, 4
+*MATERIAL, NAME=STEEL
+*ELASTIC
+210000000000.0, 0.3
+*SHELL SECTION, ELSET=EALL, MATERIAL=STEEL
+0.01
+*STEP, NAME=EXPORT_STIFFNESS
+*MATRIX GENERATE, STIFFNESS
+*MATRIX OUTPUT, STIFFNESS, FORMAT=COORDINATE
+*END STEP

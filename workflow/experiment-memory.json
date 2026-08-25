@@ -1,540 +1,490 @@
 {
-  "schema_version": 1,
-  "experiments": [
-    {
-      "id": "stage3-20260723-094610:iteration-01",
-      "run_id": "stage3-20260723-094610",
-      "iteration": 1,
-      "before_error": 0.142348,
-      "candidate_error": null,
-      "patch_applied": false,
-      "test_passed": false,
-      "accepted": false,
-      "reviewer_decision": "reject",
-      "reviewer_summary": "本轮不能接受：Developer Agent 实际没有应用补丁，`patch_applied` 为 false，失败原因为缺少 `BEGIN_UNIFIED_DIFF/END_UNIFIED_DIFF`，因此 `test_passed` 为 false，且没有任何新的 `candidate_error` 或误差下降证据。当前也没有满足“测试通过、Frobenius 相对误差实际下降、未绕过测试”的接受条件。",
-      "failure_mechanism": "本轮不能接受：Developer Agent 实际没有应用补丁，`patch_applied` 为 false，失败原因为缺少 `BEGIN_UNIFIED_DIFF/END_UNIFIED_DIFF`，因此 `test_passed` 为 false，且没有任何新的 `candidate_error` 或误差下降证据。当前也没有满足“测试通过、Frobenius 相对误差实际下降、未绕过测试”的接受条件。",
-      "do_not_repeat": [
-        "不得原样重复实验 stage3-20260723-094610:iteration-01 的理论假设和补丁机制"
-      ],
-      "next_focus": "先修正输出格式并提交真正生效的单一剪切块补丁，随后必须用同一基准重新验证 Frobenius 误差是否下降",
-      "theory_excerpt": "## 诊断证据\n\n**已知事实**\n1. 当前总误差 `0.142348`，主要由三块驱动：`membrane_xy__membrane_xy = 0.123`、`bending_shear__bending_shear = 0.321`、`drilling__drilling = 27.57`，其中膜内块和弯剪块已经显著偏离，钻转块也远高于合理范围。\n2. 最大绝对误差集中在 `uz-uz` 的对角与相邻耦合项，例如 `n1.uz-n3.uz`、`n2.uz-n4.uz`，实际值是 `-336.538e6`，期望值是 `-224.359e6`，差值固定为 `112.179e6`，这类条目强烈指向横向剪切刚度偏大，而不是纯膜内问题。\n3. 误差在 `ux/uy` 对角与邻项也呈现同一量级的系统性偏差，说明不是随机数值噪声，而是某个统一的构造口径偏离。\n4. 当前实现对横向剪切使用的是“中心点选择性减缩积分”，并且剪切 `B` 矩阵里直接用 `w` 与转角 `rx/ry` 线性耦合。\n5. Shell203 参考片段明确存在独立的横向剪切插值/修正逻辑，且它不是简单的中心点一次积分；Abaqus S4 作为主目标更接近 MITC4 口径，而不是当前这种简化 SRI 口径。\n\n**理论推断**\n1. `uz` 相关的最大偏差与 `bending_shear__bending_shear` 块偏大高度一致，说明当前最可能的主误差源是横向剪切项的插值口径，而不是膜内项本身。\n2. 钻转块误差很大，但其绝对范数很小，当前总误差中更可能是“剪切锁定/剪切刚度过硬”在主导整体 Frobenius 偏差。\n3. 由于最大偏差条目主要落在 `uz` 自由度耦合上，若先修正剪切插值，比先动钻转罚项更可能带来可观下降。\n\n## 单一修正假设\n\n**假设：当前横向剪切项的积分/插值口径不符合 Abaqus S4，应从“中心点选择性减缩积分”改为 MITC4 风格的边中点剪切投影。**\n\n也就是：本轮只把剪切块的构造方式当成唯一修正方向，优先对齐 `gamma_xz / gamma_yz` 的插值位置与场变量表达，而不先改膜内、弯曲或钻转公式。\n\n## 预期影响\n\n1. 直接降低 `bending_shear__bending_shear` 块误差，目标是把当前 `0.3207` 明显压下去。\n2. 间接缓解 `uz-uz` 及其邻接项的系统性偏大，预计 Frobenius 相对误差会有最明显的单步下降。\n3. 对膜内块影响应较小，因此不会破坏当前已经接近合理的面内结构。\n\n## 回归风险\n\n1. 如果当前实现的剪切项其实已经接近目标，仅是钻转或局部转角符号问题，那么只改剪切插值可能收益有限。\n2. MITC4 投影一旦边中点局部坐标、节点顺序或转角符号约定不一致，可能引入新的符号性偏差。\n3. 该改动会影响 `uz/rx/ry` 相关整块矩阵，验证时必须同时看对称性和分块误差，不能只看单个最大项。\n\n## 验证方法\n\n1. 只替换剪切块口径，保持膜内、弯曲、钻转和全局坐标变换不动。\n2. 重新生成 Abaqus S4 对比矩阵，检查：\n   - `bending_shear__bending_shear` 是否显著下降\n   - `n1.uz-n3.uz`、`n2.uz-n4.uz` 这类最大绝对误差是否同步收敛\n   - 总 Frobenius 相对误差是否从 `0.142348` 明显下降\n3. 若剪切块下降而钻转块仍高，但总误差已明显改善，则说明本轮方向正确；若总误差变化很小，再进入下一轮才考虑钻转罚项口径。",
-      "patch_excerpt": "[文件不存在：workflow/runs/stage3-20260723-094610/iteration-01/developer.patch]"
-    },
-    {
-      "id": "stage3-20260723-094937:iteration-01",
-      "run_id": "stage3-20260723-094937",
-      "iteration": 1,
-      "before_error": 0.142348,
-      "candidate_error": null,
-      "patch_applied": false,
-      "test_passed": false,
-      "accepted": false,
-      "reviewer_decision": "reject",
-      "reviewer_summary": "本轮不能接受：补丁未成功应用（patch dry-run failed），因此没有形成可验证的候选实现；测试也未通过，candidate_error 为空，无法证明 Frobenius 相对误差实际下降。当前只有理论假设，没有对应的 C++/Catch2 结果支撑，且没有任何已完成的数值改动可审。",
-      "failure_mechanism": "本轮不能接受：补丁未成功应用（patch dry-run failed），因此没有形成可验证的候选实现；测试也未通过，candidate_error 为空，无法证明 Frobenius 相对误差实际下降。当前只有理论假设，没有对应的 C++/Catch2 结果支撑，且没有任何已完成的数值改动可审。",
-      "do_not_repeat": [
-        "不得原样重复实验 stage3-20260723-094937:iteration-01 的理论假设和补丁机制"
-      ],
-      "next_focus": "先修复 `src/shell/ShellStiffness.cpp` 的补丁应用失败，确保单一剪切改动能真正落地并生成可运行验证日志",
-      "theory_excerpt": "## 诊断证据\n\n**已知事实**\n1. 当前 Frobenius 相对误差是 `0.142348`，主要误差集中在三个方向：\n   - 膜内块：`membrane_xy__membrane_xy = 0.1229`\n   - 弯曲剪切块：`bending_shear__bending_shear = 0.3207`\n   - 钻转相关块：`drilling__drilling = 27.57`，`membrane_xy__drilling = 37.16`\n2. 最大绝对误差条目几乎全部出现在 `ux/uy/uz` 的对角和跨节点耦合项上，尤其是 `uz` 跨边耦合：\n   - `n1.uz <-> n3.uz`、`n2.uz <-> n4.uz` 的实际值是 `-3.365e8`，期望是 `-2.244e8`\n   - 这类误差幅度接近 `1.12179e8`\n3. 当前实现采用的是：\n   - 膜内：`2x2 Gauss`\n   - 弯曲：`2x2 Gauss`\n   - 横向剪切：**中心点单点选择性减缩积分**\n   - 钻转：罚项 `alpha = 0.0085`\n4. 代码里剪切项的构造非常简化，只在中心点用 `w, rx, ry` 形成 `gamma_xz, gamma_yz`，没有看到与 MITC4 典型的边中点剪切插值一致的混合插值结构。\n5. Shell203 参考里明确有独立的剪切插值/中点相关处理，而不是单纯中心点低阶剪切积分。\n\n**理论推断**\n1. 当前误差分布不像纯粹的膜内材料常数或简单几何变换问题，更像是**剪切约束过强/过弱**导致的 `w-rx-ry` 耦合不匹配。\n2. `uz` 跨节点耦合项偏大，而对角项也同步偏大，这符合**横向剪切锁定残留**或**剪切 B 矩阵口径过硬**的特征。\n3. 钻转项虽然相对误差极高，但其绝对量级很小，且当前最大绝对误差主导并不在 drilling block；因此本轮优先级不应先改钻转罚项。\n4. 由于 Abaqus S4 是主目标，而该类四节点壳在薄板场景下通常依赖 MITC4 风格的剪切缓解，当前“中心点 SRI”很可能与 Abaqus 的等价口径不一致。\n\n## 单一修正假设\n\n**假设：将当前“中心点单点选择性减缩积分”的横向剪切实现，改为 Abaqus S4 更接近的 MITC4 边中点剪切插值口径，是本轮最有可能显著降低 Frobenius 误差的单一改动方向。**\n\n这里的具体含义不是泛泛地“调积分点”，而是：\n- 保持膜内和弯曲暂不动；\n- 只重构横向剪切的 `B` 矩阵构造方式；\n- 用边中点/混合插值来替代当前中心点单点剪切刚度。\n\n## 预期影响\n\n1. 优先改善 `bending_shear__bending_shear` 块误差，预计会带动总 Frobenius 误差下降。\n2. 可能同步降低 `uz` 相关跨节点耦合的过硬刚度，尤其是 `n1.uz <-> n3.uz`、`n2.uz <-> n4.uz` 这类条目。\n3. 若 Abaqus S4 在该样本上对剪切锁定抑制更接近 MITC4，这一改动通常比继续调 `alpha` 更有效。\n\n## 回归风险\n\n1. 如果当前误差主因其实是弯曲转角符号或 DOF 映射错误，单改剪切插值只能部分改善，甚至可能掩盖真实问题。\n2. MITC4 实现若边中点插值口径处理不严，可能引入新的非对称耦合或削弱刚度一致性。\n3. 若当前单元已在某些厚壳工况下“误打误撞”接近目标，改成 MITC4 后可能对个别块误差有回弹。\n\n## 验证方法\n\n1. 只改横向剪切构造，不动膜内、弯曲、钻转和坐标变换。\n2. 重新跑 `sample_001`，重点看：\n   - `frobenius_relative_error`\n   - `bending_shear__bending_shear`\n   - `uz` 相关最大绝对误差条目\n3. 若总误差明显下降且剪切块改善显著，说明本轮假设成立。\n4. 若剪切块改善不明显，但 `membrane_xy__drilling` 和 `drilling__drilling` 仍占主导，则下一轮再切换到钻转罚项口径核对，不要同时改多个方向。",
-      "patch_excerpt": "--- a/src/shell/ShellStiffness.cpp\n+++ b/src/shell/ShellStiffness.cpp\n@@ -237,21 +237,31 @@\n         addDrillingPenalty(\n             components.drilling, shape, kDrillingPenalty * shearModulus * input.thickness * shape.detJ);\n     }\n \n-    // 横向剪切采用中心点选择性减缩积分，避免薄壳出现严重剪切锁定。\n-    const ShapeData center = evaluateShape(geometry, 0.0, 0.0);\n+    // 横向剪切改为边中点混合插值口径，减少中心点单点积分带来的过硬约束。\n     BMatrix2 shearB{};\n-    for (std::size_t node = 0; node < kNodeCount; ++node) {\n-        const std::size_t base = node * kDofPerNode;\n-        shearB[0][base + 2] = center.dNdx[node];\n-        shearB[0][base + 4] = center.values[node];\n-        shearB[1][base + 2] = center.dNdy[node];\n-        shearB[1][base + 3] = -center.values[node];\n+    const std::array<std::array<double, 2>, 4> shearPoints = {\n+        std::array<double, 2>{0.0, -1.0},\n+        std::array<double, 2>{1.0, 0.0},\n+        std::array<double, 2>{0.0, 1.0},\n+        std::array<double, 2>{-1.0, 0.0},\n+    };\n+    for (const auto& point : shearPoints) {\n+        const ShapeData shearShape = evaluateShape(geometry, point[0], point[1]);\n+        for (std::size_t node = 0; node < kNodeCount; ++node) {\n+            const std::size_t base = node * kDofPerNode;\n+            shearB[0][base + 2] = shearShape.dNdx[node];\n+            shearB[0][base + 4] = shearShape.values[node];\n+            shearB[1][base + 2] = shearShape.dNdy[node];\n+            shearB[1][base + 3] = -shearShape.values[node];\n+        }\n+        addBtDB(components.shear, shearB, shearMaterial, shearShape.detJ);\n+        for (auto& row : shearB) {\n+            row.fill(0.0);\n+        }\n     }\n-    addBtDB(components.shear, shearB, shearMaterial, 4.0 * center.detJ);\n \n     components.total = addMatrices(addMatrices(components.membrane, components.bending),\n                                    addMatrices(components.shear, components.drilling));\n     return components;\n }"
-    },
-    {
-      "id": "stage3-20260723-095230:iteration-01",
-      "run_id": "stage3-20260723-095230",
-      "iteration": 1,
-      "before_error": 0.142348,
-      "candidate_error": 0.195318,
-      "patch_applied": true,
-      "test_passed": true,
-      "accepted": false,
-      "reviewer_decision": "reject",
-      "reviewer_summary": "测试虽然全部通过，但候选实现没有满足数值对齐的核心接受条件：Frobenius 相对误差从 0.142348 反而上升到 0.195318，绝对不是实际下降。补丁只改了 `src/shell/ShellStiffness.cpp` 的剪切积分口径，且日志里还留下了 `shearB` 未使用的编译警告，说明实现存在未清理的残留代码。当前结果不支持接受。",
-      "failure_mechanism": "测试虽然全部通过，但候选实现没有满足数值对齐的核心接受条件：Frobenius 相对误差从 0.142348 反而上升到 0.195318，绝对不是实际下降。补丁只改了 `src/shell/ShellStiffness.cpp` 的剪切积分口径，且日志里还留下了 `shearB` 未使用的编译警告，说明实现存在未清理的残留代码。当前结果不支持接受。",
-      "do_not_repeat": [
-        "不得原样重复实验 stage3-20260723-095230:iteration-01 的理论假设和补丁机制"
-      ],
-      "next_focus": "下一轮只聚焦横向剪切离散口径的正确实现与验证，先消除当前中心点/边中点方案的逻辑不一致，再重新比对 `bending_shear__bending_shear` 和 `uz` 相关最大误差项是否真正下降",
-      "theory_excerpt": "## 诊断证据\n\n**已知事实**\n1. 当前总误差 `0.142348`，远高于目标 `0.01`。\n2. 最大绝对误差集中在 `uz-uz` 对角和对称耦合项，典型差值为 `1.12179e+08`。\n3. 分块误差里，`bending_shear__bending_shear = 0.3207`，明显高于膜分块 `0.1229`。\n4. `membrane_xy__bending_shear = 1.0` 与 `bending_shear__membrane_xy = 1.0` 说明膜与弯曲/剪切之间当前完全没有互耦贡献，或者块划分方式下这些块为零。\n5. `drilling` 相关分块误差极大，但对应总能量量级很小；它不是当前 Frobenius 主误差来源。\n6. 当前实现对横向剪切采用的是**中心点单点选择性减缩积分**，而不是更接近 MITC4 的边中点剪切插值。\n7. 当前弯曲 B 矩阵里只使用了 `rx, ry`，并且符号形式为 `rx` 负 `dNdy`、`ry` 负 `dNdx` 的组合，这一部分从当前最大误差条目看不是首要矛盾。\n\n**理论推断**\n1. 误差主峰落在 `uz` 相关项，结合 `bending_shear` 分块较大，说明当前最可能的偏差来自**横向剪切的离散口径**，而不是膜刚度或钻转罚项。\n2. Abaqus S4 的核心差异很可能在于**MITC4 风格的剪切应变投影/插值**，它会显著改变 `uz-rx/ry` 及 `uz-uz` 的刚度分布。\n3. 当前单点剪切积分会在平面四边形上给出过于集中的剪切刚度，容易把 `uz-uz` 和跨节点耦合项推高或推偏，这与当前最大误差模式一致。\n\n**待验证假设**\n- 主要误差并不是来自膜或钻转，而是来自**横向剪切的积分/插值口径不匹配 Abaqus S4**；若改为 MITC4 型边中点剪切假设场，Frobenius 相对误差应出现显著下降，且 `bending_shear__bending_shear` 与 `uz` 相关最大条目会同步收敛。\n\n## 单一修正假设\n\n**本轮只改一个方向：把当前“中心点单点选择性减缩积分”的横向剪切，替换为 MITC4 风格的剪切插值/投影口径。**\n\n也就是优先修正：\n- `gamma_xz, gamma_yz` 的构造方式\n- 从“中心点直接取值”转为“按边中点/混合插值重建”\n- 保持膜、弯曲、钻转暂不动\n\n这是当前最有可能降低 Frobenius 相对误差的单点改动方向。\n\n## 预期影响\n\n1. `bending_shear__bending_shear` 误差应明显下降。\n2. `uz-uz` 以及 `uz-rx/ry` 相关条目应向 Abaqus S4 靠拢。\n3. 总体 Frobenius 相对误差预计会有最明显的单步下降，优先级高于继续微调钻转罚项。\n\n## 回归风险\n\n1. 若 MITC4 投影实现与当前局部坐标或 DOF 符号约定不一致，可能导致剪切块下降但膜-弯曲耦合出现新的偏差。\n2. 平面规则四边形上，边中点投影需要严格保持节点顺序和局部轴方向一致，否则可能引入符号翻转。\n3. 由于当前 `drilling` 误差也偏大，单独修剪切后总误差可能仍未降到 1% 以下，但这一步仍是最值当的首改方向。\n\n## 验证方法\n\n1. Developer Agent 只改剪切项，不动膜、弯曲、钻转。\n2. Test Agent 重新计算 sample_001，重点观察：\n   - `frobenius_relative_error`\n   - `bending_shear__bending_shear`\n   - 最大绝对误差是否从 `uz-uz` 主导转为更小、更分散\n3. 若总误差显著下降但仍高于目标，再进入下一轮分析钻转罚项或弯曲转角符号。",
-      "patch_excerpt": "--- a/src/shell/ShellStiffness.cpp\n+++ b/src/shell/ShellStiffness.cpp\n@@ -211,13 +211,23 @@\n         addDrillingPenalty(\n             components.drilling, shape, kDrillingPenalty * shearModulus * input.thickness * shape.detJ);\n     }\n \n-    // 横向剪切采用中心点选择性减缩积分，避免薄壳出现严重剪切锁定。\n-    const ShapeData center = evaluateShape(geometry, 0.0, 0.0);\n+    // 横向剪切改为边中点采样并做一致性平均，贴近 MITC4 的剪切投影口径。\n     BMatrix2 shearB{};\n-    for (std::size_t node = 0; node < kNodeCount; ++node) {\n-        const std::size_t base = node * kDofPerNode;\n-        shearB[0][base + 2] = center.dNdx[node];\n-        shearB[0][base + 4] = center.values[node];\n-        shearB[1][base + 2] = center.dNdy[node];\n-        shearB[1][base + 3] = -center.values[node];\n+    const std::array<ShapeData, 4> shearPoints = {\n+        evaluateShape(geometry, 0.0, -1.0),\n+        evaluateShape(geometry, 1.0, 0.0),\n+        evaluateShape(geometry, 0.0, 1.0),\n+        evaluateShape(geometry, -1.0, 0.0),\n+    };\n+    for (const auto& point : shearPoints) {\n+        BMatrix2 pointB{};\n+        for (std::size_t node = 0; node < kNodeCount; ++node) {\n+            const std::size_t base = node * kDofPerNode;\n+            pointB[0][base + 2] = point.dNdx[node];\n+            pointB[0][base + 4] = point.values[node];\n+            pointB[1][base + 2] = point.dNdy[node];\n+            pointB[1][base + 3] = -point.values[node];\n+        }\n+        addBtDB(components.shear, pointB, shearMaterial, point.detJ);\n     }\n-    addBtDB(components.shear, shearB, shearMaterial, 4.0 * center.detJ);\n \n     components.total = addMatrices(addMatrices(components.membrane, components.bending),\n                                    addMatrices(components.shear, components.drilling));\n     return components;\n }"
-    },
-    {
-      "id": "stage3-20260723-095429:iteration-01",
-      "run_id": "stage3-20260723-095429",
-      "iteration": 1,
-      "before_error": 0.142348,
-      "candidate_error": null,
-      "patch_applied": false,
-      "test_passed": false,
-      "accepted": false,
-      "reviewer_decision": "reject",
-      "reviewer_summary": "本轮补丁没有实际应用，`patch dry-run failed`，`patch_applied` 为 false，`test_passed` 为 false，且没有任何候选误差值可证明 Frobenius 相对误差下降。按接受条件，这只能拒绝；同时当前变更把钻转项从混合罚型改成仅对节点 `theta_z` 的投影约束，属于离散口径的大改，未经通过测试和误差回落验证不能接受。",
-      "failure_mechanism": "本轮补丁没有实际应用，`patch dry-run failed`，`patch_applied` 为 false，`test_passed` 为 false，且没有任何候选误差值可证明 Frobenius 相对误差下降。按接受条件，这只能拒绝；同时当前变更把钻转项从混合罚型改成仅对节点 `theta_z` 的投影约束，属于离散口径的大改，未经通过测试和误差回落验证不能接受。",
-      "do_not_repeat": [
-        "不得原样重复实验 stage3-20260723-095429:iteration-01 的理论假设和补丁机制"
-      ],
-      "next_focus": "先让补丁成功应用并跑通最小回归，拿到 candidate_error 与分块误差后再判断钻转口径是否真的降低总 Frobenius 误差",
-      "theory_excerpt": "## 诊断证据\n\n**已知事实**\n- 当前总 Frobenius 相对误差是 `0.142348`，远高于目标 `0.01`。\n- 最大绝对误差集中在 `uz-uz` 项，典型条目是 `n1.uz-n3.uz`，当前值 `-336538461.54`，期望 `-224358974.36`，偏差约 `1.12e8`。\n- 分块误差里，`membrane_xy__membrane_xy` 为 `0.1229`，`bending_shear__bending_shear` 为 `0.3207`，但最异常的是 `membrane_xy__drilling` 和 `drilling__membrane_xy` 都高到 `37.16`，`drilling__drilling` 也到 `27.57`。\n- 现实现里，剪切采用的是中心点选择性减缩积分；钻转罚项只在四个 2x2 点上叠加，且罚刚度是固定常数 `0.0085 * G * t`。\n- 当前样本是平面四边形，节点顺序逆时针，局部坐标系和全局坐标变换已存在。\n\n**理论推断**\n- `uz-uz` 这类大条目和 `bending_shear__bending_shear` 的偏大，说明主误差更像是横向剪切和弯曲耦合的口径不一致，而不是纯膜面问题。\n- 但 `drilling` 分块的相对误差异常大，且膜面与钻转之间出现强耦合误差，说明当前钻转罚项的构造口径很可能与 Abaqus S4 不一致，且它已经显著污染了总矩阵。\n- 由于钻转相关分块误差远高于膜面和弯曲主块，先修钻转口径比先动膜面 2x2 积分更有把握，尤其当前误差模式不像单纯的符号翻转或 DOF 重排。\n\n## 单一修正假设\n\n**假设：当前钻转罚项的构造方式与 Abaqus S4 不一致，主要问题不是罚系数数值，而是钻转稳定化项的离散口径应改为与剪切/膜面一致的投影型构造，而不是现在这种直接用 `N` 和 `dN/dx, dN/dy` 混合拼接的节点罚项。**\n\n换句话说，本轮只验证一件事：**重构钻转稳定化项的离散形式，使其不再以当前局部节点罚项方式直接生成 `drilling` 块。**\n\n## 预期影响\n\n- 预计会显著降低 `drilling__drilling` 和 `membrane_xy__drilling / drilling__membrane_xy`。\n- 若 Abaqus S4 的钻转稳定化确实采用更接近投影/一致化的口径，总 Frobenius 误差应出现可见下降，且不会破坏现有膜面主块的基本趋势。\n- 对 `uz-uz` 最大误差条目的影响可能有限，因此这不是最终唯一修复，但它是当前最值得先验证的高杠杆改动。\n\n## 回归风险\n\n- 如果 Abaqus S4 的钻转项本质上就是罚型稳定化，那么改动口径不当会让 `drilling__drilling` 进一步偏离。\n- 钻转项的重构可能会改变矩阵的零能模态抑制方式，若实现里与转角 DOF 映射或局部坐标变换耦合有误，可能引入新的对称块偏差。\n- 这轮不建议同时动剪切插值和钻转罚项系数，否则无法判断误差来源。\n\n## 验证方法\n\n1. 保持膜面、弯曲、剪切积分不变，仅替换钻转稳定化项的离散构造。\n2. 重新计算样本 `sample_001`，观察：\n   - `drilling__drilling`\n   - `membrane_xy__drilling`\n   - `drilling__membrane_xy`\n   - 总 Frobenius 相对误差\n3. 若总误差下降明显，说明当前主偏差确实由钻转口径污染；若几乎不变，再转向下一优先项：`uz` 主导的横向剪切/MITC4 口径。",
-      "patch_excerpt": "--- a/src/shell/ShellStiffness.cpp\n+++ b/src/shell/ShellStiffness.cpp\n@@ -171,18 +171,16 @@\n     return matrix;\n }\n \n-template <std::size_t StrainSize>\n-void addBtDB(Matrix24& stiffness,\n-             const std::array<std::array<double, kElementDof>, StrainSize>& matrixB,\n-             const std::array<std::array<double, StrainSize>, StrainSize>& material,\n-             double scale) {\n+template <std::size_t StrainSize>\n+void addBtDB(Matrix24& stiffness,\n+             const std::array<std::array<double, kElementDof>, StrainSize>& matrixB,\n+             const std::array<std::array<double, StrainSize>, StrainSize>& material,\n+             double scale) {\n     for (std::size_t row = 0; row < kElementDof; ++row) {\n         for (std::size_t col = 0; col < kElementDof; ++col) {\n             double value = 0.0;\n             for (std::size_t i = 0; i < StrainSize; ++i) {\n                 for (std::size_t j = 0; j < StrainSize; ++j) {\n                     value += matrixB[i][row] * material[i][j] * matrixB[j][col];\n                 }\n             }\n             stiffness(row, col) += scale * value;\n         }\n     }\n }\n \n-void addDrillingPenalty(Matrix24& stiffness, const ShapeData& shape, double scale) {\n-    std::array<double, kElementDof> matrixB{};\n-    for (std::size_t node = 0; node < kNodeCount; ++node) {\n-        const std::size_t base = node * kDofPerNode;\n-        matrixB[base] = 0.5 * shape.dNdy[node];\n-        matrixB[base + 1] = -0.5 * shape.dNdx[node];\n-        matrixB[base + 5] = shape.values[node];\n-    }\n-    for (std::size_t row = 0; row < kElementDof; ++row) {\n-        for (std::size_t col = 0; col < kElementDof; ++col) {\n-            stiffness(row, col) += scale * matrixB[row] * matrixB[col];\n-        }\n-    }\n+void addDrillingPenalty(Matrix24& stiffness, const ShapeData& shape, double scale) {\n+    // 采用与膜面一致的投影型稳定化口径，只保留节点钻转自由度的平均约束。\n+    std::array<double, kNodeCount> projector{};\n+    for (std::size_t node = 0; node < kNodeCount; ++node) {\n+        projector[node] = shape.values[node];\n+    }\n+    for (std::size_t rowNode = 0; rowNode < kNodeCount; ++rowNode) {\n+        const std::size_t row = rowNode * kDofPerNode + 5;\n+        for (std::size_t colNode = 0; colNode < kNodeCount; ++colNode) {\n+            const std::size_t col = colNode * kDofPerNode + 5;\n+            stiffness(row, col) += scale * projector[rowNode] * projector[colNode];\n+        }\n+    }\n }\n*** End Patch"
-    },
-    {
-      "id": "stage3-20260723-095429:iteration-02",
-      "run_id": "stage3-20260723-095429",
-      "iteration": 2,
-      "before_error": 0.142348,
-      "candidate_error": 0.195318,
-      "patch_applied": true,
-      "test_passed": true,
-      "accepted": false,
-      "reviewer_decision": "reject",
-      "reviewer_summary": "补丁已成功应用且测试通过，但候选实现的 Frobenius 相对误差从 0.142348 上升到 0.195318，未满足“真实误差下降”的接受条件。此次改动还把剪切项从中心点单点口径改成 4 个边中点求和，属于明显扩大离散口径的做法；虽然没有绕过测试，但结果表明这条修改方向在当前实现里是负向的。最大误差仍集中在 `uz` 相关项，说明问题没有被这次改动解决。",
-      "failure_mechanism": "补丁已成功应用且测试通过，但候选实现的 Frobenius 相对误差从 0.142348 上升到 0.195318，未满足“真实误差下降”的接受条件。此次改动还把剪切项从中心点单点口径改成 4 个边中点求和，属于明显扩大离散口径的做法；虽然没有绕过测试，但结果表明这条修改方向在当前实现里是负向的。最大误差仍集中在 `uz` 相关项，说明问题没有被这次改动解决。",
-      "do_not_repeat": [
-        "不得原样重复实验 stage3-20260723-095429:iteration-02 的理论假设和补丁机制"
-      ],
-      "next_focus": "只回到横向剪切口径本身，验证边中点插值是否与当前 DOF 映射/转角符号一致，先排除剪切 B 矩阵构造错误再继续调整",
-      "theory_excerpt": "## 诊断证据\n\n**已知事实**\n1. 当前总 Frobenius 相对误差是 `0.142348`，远高于目标 `0.01`。\n2. 最大绝对误差集中在 `uz-uz` 对角与跨节点耦合项，典型差值是 `1.12179e+08`，而不是随机散布。\n3. 分块误差里最异常的是 `drilling__membrane_xy = 37.16`、`membrane_xy__drilling = 37.16`、`drilling__drilling = 27.57`，其次是 `bending_shear__bending_shear = 0.3207`，`membrane_xy__membrane_xy = 0.123`。\n4. 当前实现使用了 `2 x 2` 面内/弯曲积分、中心点减缩剪切、钻转罚刚度 `alpha=0.0085`。\n5. 上一轮关于钻转口径的改动没有通过应用和测试，不能作为有效证据。\n\n**理论推断**\n1. 误差主峰首先出现在 `uz` 相关条目，说明当前主要偏差不在纯膜或纯钻转对角项，而更像是**横向剪切/弯曲耦合口径**不一致。\n2. `bending_shear__bending_shear` 已经有显著误差，但没有像钻转分块那样夸张，说明“纯钻转罚项参数微调”单独不足以解释总误差主峰。\n3. 现实现里的剪切项采用了中心点单点减缩积分，这与 Abaqus S4 的 MITC4 类剪切插值/口径很可能不一致；这类不一致通常会直接影响 `uz`、`rx/ry` 相关块以及部分膜-剪切耦合项。\n4. Shell203 参考片段显示其剪切和转角相关项并不是简单的中心点单点公式，而是通过更复杂的中面/边点插值与几何方向投影构造，这进一步支持“当前剪切口径过于粗糙”的判断。\n\n**待验证假设**\n- 当前最可能有效的一项修正，是把**横向剪切从中心点选择性减缩积分，改为与 Abaqus S4 更一致的 MITC4 剪切插值口径**，优先修正剪切应变的插值点与转角参与方式，而不是先动钻转罚项。\n\n## 单一修正假设\n\n**假设：当前 Frobenius 误差的主来源是横向剪切离散口径，而非钻转罚项本身；应优先把剪切项从中心点 SRI 改成 MITC4 风格的剪切插值。**\n\n这是一条单一改动方向，落地时只让 Developer Agent 聚焦于剪切 B 矩阵/积分口径，不同时改膜、弯曲或钻转参数。\n\n## 预期影响\n\n1. 预计会优先降低 `uz` 相关最大误差条目，尤其是 `n1.uz <-> n3.uz`、`n2.uz <-> n4.uz` 这类跨对角耦合。\n2. 预计会显著压低 `bending_shear__bending_shear`，并间接改善 `membrane_xy__bending_shear` 和 `bending_shear__membrane_xy` 这类耦合块。\n3. 总 Frobenius 相对误差有望出现比单纯调 `alpha` 更大的下降幅度，因为当前最大差值已经明确落在剪切主导的位移-转角耦合模式上。\n\n## 回归风险\n\n1. MITC4 剪切实现若与当前局部坐标、转角符号或 DOF 映射不一致，可能把误差从 `uz` 块转移到 `rx/ry` 或耦合块。\n2. 剪切口径改动会影响壳单元最敏感的数值稳定性，若边点插值或方向投影处理不严谨，可能引入新的锁定或非物理耦合。\n3. 由于当前钻转项误差也很大，单独修剪切不一定一步到位，但这是当前最值得优先验证的方向。\n\n## 验证方法\n\n1. Developer Agent 仅实现一版 MITC4 风格剪切插值替换，保持膜、弯曲、钻转公式不动。\n2. Test Agent 重新跑 `sample_001`，重点看：\n   - `frobenius_relative_error` 是否下降；\n   - `bending_shear__bending_shear` 是否显著下降；\n   - `uz-uz` 最大绝对误差是否明显缩小；\n   - `membrane_xy__bending_shear` / `bending_shear__membrane_xy` 是否同步改善。\n3. 若总误差未明显下降，再进入下一轮，只在**钻转罚项口径**和**DOF 映射/转角符号**之间二选一，不要同时扩改。",
-      "patch_excerpt": "--- a/src/shell/ShellStiffness.cpp\n+++ b/src/shell/ShellStiffness.cpp\n@@ -243,22 +243,37 @@\n     for (const auto& point : integrationPoints) {\n         const ShapeData shape = evaluateShape(geometry, point[0], point[1]);\n         BMatrix3 membraneB{};\n         BMatrix3 bendingB{};\n@@ -280,20 +295,34 @@\n         addDrillingPenalty(\n             components.drilling, shape, kDrillingPenalty * shearModulus * input.thickness * shape.detJ);\n     }\n \n-    // 横向剪切采用中心点选择性减缩积分，避免薄壳出现严重剪切锁定。\n-    const ShapeData center = evaluateShape(geometry, 0.0, 0.0);\n+    // 横向剪切改为边中点插值，降低中心点单点口径带来的偏差。\n+    const std::array<std::array<double, 2>, 4> shearPoints = {\n+        std::array<double, 2>{0.0, -1.0},\n+        std::array<double, 2>{1.0, 0.0},\n+        std::array<double, 2>{0.0, 1.0},\n+        std::array<double, 2>{-1.0, 0.0},\n+    };\n     BMatrix2 shearB{};\n-    for (std::size_t node = 0; node < kNodeCount; ++node) {\n-        const std::size_t base = node * kDofPerNode;\n-        shearB[0][base + 2] = center.dNdx[node];\n-        shearB[0][base + 4] = center.values[node];\n-        shearB[1][base + 2] = center.dNdy[node];\n-        shearB[1][base + 3] = -center.values[node];\n+    for (const auto& point : shearPoints) {\n+        const ShapeData shape = evaluateShape(geometry, point[0], point[1]);\n+        for (std::size_t node = 0; node < kNodeCount; ++node) {\n+            const std::size_t base = node * kDofPerNode;\n+            shearB[0][base + 2] = shape.dNdx[node];\n+            shearB[0][base + 4] = shape.values[node];\n+            shearB[1][base + 2] = shape.dNdy[node];\n+            shearB[1][base + 3] = -shape.values[node];\n+        }\n+        addBtDB(components.shear, shearB, shearMaterial, shape.detJ);\n+        for (std::size_t row = 0; row < 2; ++row) {\n+            for (std::size_t col = 0; col < kElementDof; ++col) {\n+                shearB[row][col] = 0.0;\n+            }\n+        }\n     }\n-    addBtDB(components.shear, shearB, shearMaterial, 4.0 * center.detJ);\n \n     components.total = addMatrices(addMatrices(components.membrane, components.bending),\n                                    addMatrices(components.shear, components.drilling));\n     return components;\n }"
-    },
+  "schema_version": 2,
+  "project_id": "abaqus-s4-stiffness",
+  "planning_generation": 2,
+  "reset_at": "2026-08-19T11:34:10+08:00",
+  "reset_reason": "通用工具流规划重启：清空当前代次候选与补丁指纹，但保留旧 S4 实验的只读失败教训，要求 Planner 避免重复已证伪方向",
+  "history_policy": "active_generation_only",
+  "archived_lessons": [
     {
       "id": "stage3-20260723-095429:iteration-03",
-      "run_id": "stage3-20260723-095429",
-      "iteration": 3,
-      "before_error": 0.142348,
-      "candidate_error": 0.142174,
-      "patch_applied": true,
-      "test_passed": true,
+      "experiment_class": "",
       "accepted": true,
-      "reviewer_decision": "accept",
-      "reviewer_summary": "补丁已实际应用，`scripts/run_stage3.sh` 退出码为 0，Catch2 43 项断言全部通过。Frobenius 相对误差从 0.142348 下降到 0.142174，满足“真实误差下降”的最低接受条件；同时对称性误差也进一步降低到 1.95159e-20，且没有迹象表明测试被绕过或范围被扩大。虽然误差仍远高于目标 0.01，但按本轮阶段3规则，这次迭代是有效改进。",
       "failure_mechanism": "",
       "do_not_repeat": [],
-      "next_focus": "继续只收敛钻转罚项的离散口径，验证是否还能进一步压低 `drilling__drilling` 与 `membrane_xy__drilling`/`drilling__membrane_xy` 而不抬高 `uz` 相关跨节点误差",
-      "theory_excerpt": "## 诊断证据\n\n**已知事实**\n1. 当前总误差仍是 `0.142348`，远高于目标 `0.01`。\n2. 最大绝对误差集中在 `n1.uz-n3.uz`、`n2.uz-n4.uz` 这类**跨对角位移耦合项**，差值约 `1.12179e8`。\n3. 分块误差里最异常的是：\n   - `membrane_xy__drilling = 37.159`\n   - `drilling__membrane_xy = 37.159`\n   - `drilling__drilling = 27.568`\n   - `bending_shear__bending_shear = 0.3207`\n   - `membrane_xy__membrane_xy = 0.123`\n4. 上一轮把横向剪切从中心点单点口径改成 4 个边中点后，**总误差上升**到 `0.195318`，说明“扩大剪切积分口径”不是当前有效方向。\n5. 现在代码里横向剪切仍采用中心点 SRI，且 `shearB` 只包含 `w, rx, ry` 的局部耦合，`uz` 最大误差并没有被此口径解释掉。\n6. 当前代码中钻转罚项是\n   - `matrixB[base + 5] = shape.values[node]`\n   - 同时带了 `0.5 * dNdy`、`-0.5 * dNdx` 的混合投影\n   这和 Abaqus S4 的钻转处理口径高度可疑，且与分块误差里的异常大钻转块一致。\n\n**理论推断**\n1. 误差主源不在膜内整体积分，也不在简单的横向剪切积分点数量，而更像是**钻转自由度的离散口径与 Abaqus S4 不一致**。\n2. `membrane_xy <-> drilling` 交叉块异常大，说明钻转不是孤立对角罚项问题，而是**与面内应变构造存在耦合误配**。\n3. `uz` 跨对角项误差大，说明刚度分配里有一部分本应由剪切/钻转相关机制调节的耦合被放错位置，或者钻转罚项的投影方式改变了局部平衡。\n\n## 单一修正假设\n\n**假设：当前最值得先改的是“钻转罚项的构造口径”而不是剪切积分点数量。**\n\n具体说，优先怀疑：\n- 钻转刚度不应采用当前这种“面内导数 + 节点 `theta_z` 形函数值”的混合罚型；\n- 更接近 Abaqus S4 的做法可能是**仅对节点钻转角 `rz/theta_z` 做纯罚约束**，或至少应把钻转与面内梯度项解耦。\n\n这是本轮唯一优先假设。\n\n## 预期影响\n\n1. 先显著压低 `drilling__drilling` 和 `membrane_xy__drilling / drilling__membrane_xy`。\n2. 若钻转口径确实是主偏差源，`uz` 相关跨节点项也可能随之下降，因为当前总矩阵中钻转耦合会扰动剪切/弯曲的平衡分配。\n3. 预计总 Frobenius 误差有机会从 `0.142` 明显下降，但幅度不保证；若下降不明显，则说明主误差仍在剪切 B 矩阵或转角符号。\n\n## 回归风险\n\n1. 若 Abaqus S4 实际采用的是更复杂的钻转稳定化，而不是纯 `theta_z` 罚项，单纯去掉面内导数会削弱刚度并引入新偏差。\n2. 钻转项如果改得过猛，可能让对角块和膜-钻耦合块下降，但总矩阵别的块会上升。\n3. 由于上一轮剪切口径扩大已被证伪，这轮若同时动剪切与钻转会失去可归因性，所以本轮必须只动钻转构造。\n\n## 验证方法\n\n1. Developer 只改一件事：把钻转罚项改成**纯 `theta_z` 节点约束口径**，保持其他膜、弯曲、剪切积分不动。\n2. Test Agent 重新跑同一样本 `sample_001`，比较：\n   - `frobenius_relative_error`\n   - `drilling__drilling`\n   - `membrane_xy__drilling`\n   - `drilling__membrane_xy`\n   - `max_absolute_error` 是否从 `uz` 相关项附近继续变化\n3. 接受标准只看两点：\n   - 总误差必须下降\n   - 钻转相关分块误差必须同步收敛，而不是只改变数值分布\n\n当前结论很明确：**先收钻转罚项，不再扩剪切积分口径。**",
-      "patch_excerpt": "--- a/src/shell/ShellStiffness.cpp\n+++ b/src/shell/ShellStiffness.cpp\n@@ -161,13 +161,10 @@\n \n void addDrillingPenalty(Matrix24& stiffness, const ShapeData& shape, double scale) {\n     std::array<double, kElementDof> matrixB{};\n     for (std::size_t node = 0; node < kNodeCount; ++node) {\n         const std::size_t base = node * kDofPerNode;\n-        matrixB[base] = 0.5 * shape.dNdy[node];\n-        matrixB[base + 1] = -0.5 * shape.dNdx[node];\n         matrixB[base + 5] = shape.values[node];\n     }\n     for (std::size_t row = 0; row < kElementDof; ++row) {\n         for (std::size_t col = 0; col < kElementDof; ++col) {\n             stiffness(row, col) += scale * matrixB[row] * matrixB[col];"
+      "next_focus": "继续只收敛钻转罚项的离散口径，验证是否还能进一步压低 `drilling__drilling` 与 `membrane_xy__drilling`/`drilling__membrane_xy` 而不抬高 `uz` 相关跨节点误差"
     },
     {
       "id": "stage3-20260724-105751:iteration-01",
-      "run_id": "stage3-20260724-105751",
-      "iteration": 1,
-      "before_error": 0.142174,
-      "candidate_error": 0.196238,
-      "patch_applied": true,
-      "test_passed": true,
+      "experiment_class": "",
       "accepted": false,
-      "reviewer_decision": "reject",
-      "reviewer_summary": "测试通过了（43 assertions, 6 test cases），但候选实现没有满足数值对齐的核心接受条件：Frobenius 相对误差从 0.142174 反而上升到 0.196238，目标误差未下降，且最大绝对误差与最大相对条目误差没有改善。补丁虽然只改了剪切项，符合单点修改约束，但实际结果明确变差，因此不能接受。",
       "failure_mechanism": "测试通过了（43 assertions, 6 test cases），但候选实现没有满足数值对齐的核心接受条件：Frobenius 相对误差从 0.142174 反而上升到 0.196238，目标误差未下降，且最大绝对误差与最大相对条目误差没有改善。补丁虽然只改了剪切项，符合单点修改约束，但实际结果明确变差，因此不能接受。",
       "do_not_repeat": [
         "不得原样重复实验 stage3-20260724-105751:iteration-01 的理论假设和补丁机制"
       ],
-      "next_focus": "只盯横向剪切构造本身，先验证 MITC4 投影里边中点应变组合和局部自由度符号/方向是否正确，再看剪切块误差是否真正下降。",
-      "theory_excerpt": "## 诊断证据\n\n已知事实：\n1. 总体 Frobenius 相对误差是 `0.142174`，离 1% 目标还远。\n2. 分块误差里，`membrane_xy__membrane_xy = 0.1227`，`bending_shear__bending_shear = 0.3207`，而 `drilling__drilling = 27.57`，说明钻转块严重失配，但它的绝对量级只有 `1.9e6`，远小于膜/剪切分块。\n3. 最大绝对误差集中在 `uz-uz` 对角附近和部分 `ux/uy` 交叉项，数值形态更像“弯曲-剪切刚度口径不一致”，而不是纯符号翻转。\n4. 当前实现里横向剪切采用中心点选择性减缩积分，公式是\n   `shearB[0][uz] = dNdx`, `shearB[0][ry] = +N`,\n   `shearB[1][uz] = dNdy`, `shearB[1][rx] = -N`，\n   并在中心点上乘以 `4.0 * center.detJ`。\n5. Abaqus S4 作为主对齐目标，通常不会只靠“中心点 1 点剪切”去逼近，它更接近 MITC4/假设应变类的剪切投影口径。Shell203 参考里也明确把剪切与中面插值、局部方向向量、积分点口径分开处理。\n6. 当前代码里膜、弯曲、剪切、钻转都已经独立拆块，说明最值得优先动的是“剪切项的应变构造”，因为它能同时影响 `bending_shear__bending_shear` 和一部分 `uz` 主导的大误差项。\n\n理论推断：\n- 目前 0.32 的剪切块误差，和最大绝对误差集中在 `uz` 相关条目，符合“横向剪切约束过强或插值口径不对”的特征。\n- 钻转罚项虽失配很大，但它的分量范数小，单独修正很难把总误差从 0.14 一步拉到 0.01；剪切项对总误差的贡献更大，也更可能修正 `uz-uz` 主导误差。\n- Abaqus S4 的关键差异，优先级应放在 MITC4 剪切投影，而不是先调罚因子或膜材料常数。\n\n待验证假设：\n- 当前主要误差来源是“横向剪切仍按中心点 SRI 直接用 `dNdx/dNdy + N` 构造”，而不是 Abaqus S4 式的 MITC4 剪切插值/投影；把剪切项改成与边中点相关的假想应变构造，能显著降低 `bending_shear__bending_shear` 并压低 `uz` 相关最大误差，从而改善总 Frobenius 误差。\n\n## 单一修正假设\n\n本轮只做一个方向：**把横向剪切从中心点选择性减缩积分，改为 MITC4 剪切投影口径。**\n\n具体含义不是改材料，不是调罚因子，而是改剪切应变的构造方式，使 `gamma_xz/gamma_yz` 不再直接由中心点的 `dNdx/dNdy` 与 `N` 组装，而是用边中点/投影后的假想剪切应变来抑制锁定并贴近 Abaqus S4。\n\n## 预期影响\n\n1. `bending_shear__bending_shear` 预计是最先下降的块。\n2. `uz` 相关最大绝对误差应明显收敛，因为这类条目主要受横向剪切刚度控制。\n3. 总 Frobenius 相对误差有较大概率从 `0.142` 下降一档，且这是当前最有性价比的单点修正。\n\n## 回归风险\n\n1. 如果现有实现实际上已经接近 Abaqus 的剪切口径，改成 MITC4 可能只改善一部分，甚至对某些面内耦合项带来轻微扰动。\n2. 剪切投影实现若边中点顺序、局部坐标方向或转角符号处理错了，可能把误差从“锁定型”变成“符号型”。\n3. 这一改动会改变剪切块的稀疏模式和数值尺度，后续需要重新检查钻转块与弯曲块的相对平衡。\n\n## 验证方法\n\n1. 保持膜、弯曲、钻转完全不动，只替换剪切构造。\n2. 重新跑 `sample_001`，重点看这三个指标：\n   - `frobenius_relative_error`\n   - `bending_shear__bending_shear`\n   - `largest_absolute_entries` 里 `uz` 相关条目\n3. 如果剪切块显著下降但总误差仍卡在 0.1 左右，再进入下一轮处理钻转罚项口径；这一轮不要同时动多个自由度方向，避免无法归因。",
-      "patch_excerpt": "--- a/src/shell/ShellStiffness.cpp\n+++ b/src/shell/ShellStiffness.cpp\n@@ -1,300 +1,312 @@\n #include \"shell/ShellStiffness.hpp\"\n \n #include <algorithm>\n #include <array>\n #include <cmath>\n #include <stdexcept>\n #include <string>\n@@ -203,27 +203,39 @@\n         addDrillingPenalty(\n             components.drilling, shape, kDrillingPenalty * shearModulus * input.thickness * shape.detJ);\n     }\n \n-    // 横向剪切采用中心点选择性减缩积分，避免薄壳出现严重剪切锁定。\n-    const ShapeData center = evaluateShape(geometry, 0.0, 0.0);\n+    // 横向剪切改为 MITC4 风格的边中点投影，降低中心点直接组装带来的锁定。\n+    const ShapeData xiMinus = evaluateShape(geometry, -1.0, 0.0);\n+    const ShapeData xiPlus = evaluateShape(geometry, 1.0, 0.0);\n+    const ShapeData etaMinus = evaluateShape(geometry, 0.0, -1.0);\n+    const ShapeData etaPlus = evaluateShape(geometry, 0.0, 1.0);\n     BMatrix2 shearB{};\n     for (std::size_t node = 0; node < kNodeCount; ++node) {\n         const std::size_t base = node * kDofPerNode;\n-        shearB[0][base + 2] = center.dNdx[node];\n-        shearB[0][base + 4] = center.values[node];\n-        shearB[1][base + 2] = center.dNdy[node];\n-        shearB[1][base + 3] = -center.values[node];\n+        const double gammaXzDx = 0.5 * (xiMinus.dNdx[node] + xiPlus.dNdx[node]);\n+        const double gammaXzDy = 0.5 * (xiMinus.dNdy[node] + xiPlus.dNdy[node]);\n+        const double gammaXzRy = 0.5 * (xiMinus.values[node] + xiPlus.values[node]);\n+        const double gammaYzDx = 0.5 * (etaMinus.dNdx[node] + etaPlus.dNdx[node]);\n+        const double gammaYzDy = 0.5 * (etaMinus.dNdy[node] + etaPlus.dNdy[node]);\n+        const double gammaYzRx = 0.5 * (etaMinus.values[node] + etaPlus.values[node]);\n+\n+        shearB[0][base + 2] = gammaXzDx;\n+        shearB[0][base + 4] = gammaXzRy;\n+        shearB[0][base + 3] = 0.25 * (gammaXzDy - gammaYzDx);\n+\n+        shearB[1][base + 2] = gammaYzDy;\n+        shearB[1][base + 3] = -gammaYzRx;\n+        shearB[1][base + 4] = -0.25 * (gammaXzDy - gammaYzDx);\n     }\n-    addBtDB(components.shear, shearB, shearMaterial, 4.0 * center.detJ);\n+    addBtDB(components.shear, shearB, shearMaterial, 4.0 * evaluateShape(geometry, 0.0, 0.0).detJ);\n \n     components.total = addMatrices(addMatrices(components.membrane, components.bending),\n                                    addMatrices(components.shear, components.drilling));\n     return components;\n }\n \n } // namespace\n \n ShellStiffnessComponents computeShellElementStiffnessComponents(const ShellElementInput& input) {\n     validateInput(input);\n     const LocalGeometry geometry = buildLocalGeometry(input);\n     const ShellStiffnessComponents local\n[已截断 599 个字符]"
+      "next_focus": "只盯横向剪切构造本身，先验证 MITC4 投影里边中点应变组合和局部自由度符号/方向是否正确，再看剪切块误差是否真正下降。"
     },
     {
       "id": "stage3-20260724-105751:iteration-02",
-      "run_id": "stage3-20260724-105751",
-      "iteration": 2,
-      "before_error": 0.142174,
-      "candidate_error": null,
-      "patch_applied": false,
-      "test_passed": false,
+      "experiment_class": "",
       "accepted": false,
-      "reviewer_decision": "reject",
-      "reviewer_summary": "本轮不能接受：补丁未实际应用（patch dry-run failed），因此没有生成可验证的候选实现；测试也未通过，candidate_error 为空，无法证明 Frobenius 相对误差下降。现有证据只说明仍停留在理论假设阶段，没有达到接受条件要求的“测试通过 + 误差实际下降”。",
       "failure_mechanism": "本轮不能接受：补丁未实际应用（patch dry-run failed），因此没有生成可验证的候选实现；测试也未通过，candidate_error 为空，无法证明 Frobenius 相对误差下降。现有证据只说明仍停留在理论假设阶段，没有达到接受条件要求的“测试通过 + 误差实际下降”。",
       "do_not_repeat": [
         "不得原样重复实验 stage3-20260724-105751:iteration-02 的理论假设和补丁机制"
       ],
-      "next_focus": "先修复并让唯一的横向剪切改动真正落地，再重新跑 Catch2 验证，重点只看 frobenius_relative_error 是否低于 0.142174。",
-      "theory_excerpt": "**诊断证据**\n\n- 已知事实：当前总误差 `0.142174`，最大绝对误差集中在 `n1.uz-n3.uz`、`n2.uz-n4.uz` 这类跨对角 `uz-uz` 项，实际值比 Abaqus S4 偏大约 `1.12e8`。\n- 已知事实：分块误差里，`bending_shear__bending_shear = 0.3207`，明显高于膜块 `0.1227`；`drilling__drilling = 27.57` 很大，但按块范数看钻转块绝对能量很小，未必是主导当前 Frobenius 误差的来源。\n- 已知事实：上轮只改了剪切项，整体误差从 `0.142174` 升到 `0.196238`，说明“剪切构造方向”确实相关，但当前实现的剪切改动不是正确形式。\n- 理论推断：最大误差条目集中在 `uz-uz` 对角项，且弯曲-剪切块误差显著，符合 MITC4 剪切投影或剪切应变符号/方向仍不一致的特征。当前实现用中心点选择性减缩积分，属于简化版横向剪切，和 Abaqus S4 的剪切插值口径仍可能不一致。\n- 理论推断：膜块误差存在但次于弯曲-剪切块；若先动 DOF 映射或面内项，未必能解释 `uz-uz` 对角偏差主峰。\n- 待验证假设：Abaqus S4 在四节点壳的横向剪切上更接近 MITC4 的边中点投影，而不是单点中心积分；当前 `w, θx, θy` 组合式的剪切 B 矩阵仍缺少边中点约束或局部旋转方向一致性校正。\n\n**单一修正假设**\n\n- 本轮只修正 **横向剪切的 MITC4 边中点投影口径**：将当前“中心点选择性减缩积分”替换为基于四条边中点的剪切应变插值/投影构造，并同时核对局部转角符号方向是否与 Abaqus S4 一致。\n- 这是本轮唯一优先方向，不同时触碰膜、弯曲、钻转罚项或全局坐标变换。\n\n**预期影响**\n\n- 预期首先降低 `bending_shear__bending_shear` 分块误差，并带动 `uz-uz`、`uz-θ` 相关耦合项回落。\n- 若当前偏差主要来自剪切锁定或剪切投影不对，Frobenius 误差应出现可见下降，而不是像上轮那样上升。\n- 对膜块影响应较小，最多是间接的微小变化。\n\n**回归风险**\n\n- 若 Abaqus S4 对该平面矩形样本的剪切口径并非纯 MITC4 边中点投影，而是更复杂的混合积分/局部坐标定义，单独替换后可能只改善局部块误差，整体误差下降有限。\n- 剪切项改动可能改变刚度矩阵对称性实现细节；虽然理论上应保持对称，但实现中的投影权重或边中点顺序若有误，会引入新偏差。\n- 由于当前钻转块本身误差很大，剪切修正未必能把总误差直接压到 1% 以下，但这是当前最有信息增益的单点改动。\n\n**验证方法**\n\n- Test Agent 只做这一项改动后的回归，观察三组指标：\n  1. `frobenius_relative_error` 是否从 `0.142174` 下降。\n  2. `bending_shear__bending_shear` 是否显著低于 `0.3207`。\n  3. 最大绝对误差是否从 `n1.uz-n3.uz` 这类条目回落。\n- 若总误差不降反升，说明剪切投影方向假设错误，应转而检查 **弯曲转角符号/局部 DOF 映射**，但本轮不同时推进。",
-      "patch_excerpt": "--- a/src/shell/ShellStiffness.cpp\n+++ b/src/shell/ShellStiffness.cpp\n@@ -239,19 +239,34 @@\n     }\n     addBtDB(components.drilling, shape, kDrillingPenalty * shearModulus * input.thickness * shape.detJ);\n \n-    // 横向剪切采用中心点选择性减缩积分，避免薄壳出现严重剪切锁定。\n-    const ShapeData center = evaluateShape(geometry, 0.0, 0.0);\n-    BMatrix2 shearB{};\n-    for (std::size_t node = 0; node < kNodeCount; ++node) {\n-        const std::size_t base = node * kDofPerNode;\n-        shearB[0][base + 2] = center.dNdx[node];\n-        shearB[0][base + 4] = center.values[node];\n-        shearB[1][base + 2] = center.dNdy[node];\n-        shearB[1][base + 3] = -center.values[node];\n+    // 横向剪切改为四条边中点投影：分别约束每条边上的切向剪切应变，避免单点中心积分偏差。\n+    const std::array<std::array<double, 2>, 4> shearPoints = {\n+        std::array<double, 2>{0.0, -1.0},\n+        std::array<double, 2>{1.0, 0.0},\n+        std::array<double, 2>{0.0, 1.0},\n+        std::array<double, 2>{-1.0, 0.0},\n+    };\n+    const std::array<Vector3, 4> shearDirections = {\n+        Vector3{1.0, 0.0, 0.0},\n+        Vector3{0.0, 1.0, 0.0},\n+        Vector3{1.0, 0.0, 0.0},\n+        Vector3{0.0, 1.0, 0.0},\n+    };\n+    for (std::size_t edge = 0; edge < shearPoints.size(); ++edge) {\n+        const ShapeData edgeShape = evaluateShape(geometry, shearPoints[edge][0], shearPoints[edge][1]);\n+        BMatrix2 shearB{};\n+        for (std::size_t node = 0; node < kNodeCount; ++node) {\n+            const std::size_t base = node * kDofPerNode;\n+            const double directionWeight = shearDirections[edge][0] * edgeShape.dNdx[node] +\n+                                           shearDirections[edge][1] * edgeShape.dNdy[node];\n+            shearB[0][base + 2] = directionWeight;\n+            shearB[0][base + 3] = edgeShape.values[node] * shearDirections[edge][0];\n+            shearB[0][base + 4] = edgeShape.values[node] * shearDirections[edge][1];\n+            shearB[1][base + 2] = -directionWeight;\n+            shearB[1][base + 3] = -edgeShape.values[node] * shearDirections[edge][0];\n+            shearB[1][base + 4] = -edgeShape.values[node] * shearDirections[edge][1];\n+        }\n+        addBtDB(components.shear, shearB, shearMaterial, edgeShape.detJ);\n     }\n-    addBtDB(components.shear, shearB, shearMaterial, 4.0 * center.detJ);\n \n     components.total = addMatrices(addMatrices(components.membrane, components.bending),\n                                    addMatrices(components.shear, components.drilling));\n     return components;\n }"
+      "next_focus": "先修复并让唯一的横向剪切改动真正落地，再重新跑 Catch2 验证，重点只看 frobenius_relative_error 是否低于 0.142174。"
     },
     {
       "id": "stage3-20260724-105751:iteration-03",
-      "run_id": "stage3-20260724-105751",
-      "iteration": 3,
-      "before_error": 0.142174,
-      "candidate_error": null,
-      "patch_applied": true,
-      "test_passed": false,
+      "experiment_class": "",
       "accepted": false,
-      "reviewer_decision": "reject",
-      "reviewer_summary": "本轮补丁已实际应用，但验证未通过：`scripts/run_stage3.sh` 退出码为 1，Catch2 明确失败于 `error.frobeniusRelative < 0.2`，实际 Frobenius relative error 为 `0.251709`。这不仅没有优于基线 `0.142174`，反而显著恶化，因而不满足“测试通过 + 误差实际下降”的接受条件。补丁也没有绕过测试，但数值结果直接否定了当前 MITC4 边中点投影实现。",
       "failure_mechanism": "本轮补丁已实际应用，但验证未通过：`scripts/run_stage3.sh` 退出码为 1，Catch2 明确失败于 `error.frobeniusRelative < 0.2`，实际 Frobenius relative error 为 `0.251709`。这不仅没有优于基线 `0.142174`，反而显著恶化，因而不满足“测试通过 + 误差实际下降”的接受条件。补丁也没有绕过测试，但数值结果直接否定了当前 MITC4 边中点投影实现。",
       "do_not_repeat": [
         "不得原样重复实验 stage3-20260724-105751:iteration-03 的理论假设和补丁机制"
       ],
-      "next_focus": "只检查横向剪切的边中点投影权重与累加方式，确认是否把四个边点的贡献重复/缩放错误地叠加进了单个剪切刚度块。",
-      "theory_excerpt": "## 诊断证据\n\n**已知事实**\n1. 当前主误差是 `Frobenius relative error = 0.142174`，且最大绝对误差集中在 `uz-uz` 对角和交叉项：\n   - `n1.uz <-> n3.uz`、`n2.uz <-> n4.uz` 的误差最大，实际值比 Abaqus 大约 `1.1218e8`\n2. 分块误差里，`bending_shear__bending_shear = 0.3207`，明显高于膜块的 `0.1227`，而 `drilling__drilling = 27.57` 极端偏离。\n3. 目前实现中，横向剪切用的是“中心点选择性减缩积分”，不是 MITC4 的边中点剪切投影。\n4. `bendingB` 的转角符号已经采用了 `θx/θy` 的混合正负号，但 `Shear` 只在中心点用 `w, θx, θy` 直接构造，没有做边中点约束。\n5. Reviewer 上轮已经明确提示：只盯横向剪切构造本身，先验证 MITC4 投影里边中点应变组合和局部自由度符号/方向是否正确。\n\n**理论推断**\n1. `uz-uz` 的主偏差位于剪切/弯曲耦合敏感项上，不像纯膜块误差主导；这更符合剪切插值过硬或方向不一致，而不是整体材料参数问题。\n2. 仅中心点减缩积分会保留错误的剪切应变模态，尤其在正方/平面四边形上，容易把本应由 MITC4 去除的寄生剪切刚度保留下来。\n3. 当前 `drilling__drilling` 失真虽大，但它的范数很小，优先级低于剪切块对总 Frobenius 的贡献。\n\n**待验证假设**\n- 现有误差的第一来源不是钻转罚项，而是“横向剪切 B 矩阵没有按 MITC4 的边中点投影构造”，导致 `bending_shear` 块过硬，并放大了 `uz` 相关条目的刚度偏差。\n\n## 单一修正假设\n\n**把横向剪切从“中心点选择性减缩积分”改为“MITC4 边中点投影剪切插值”**，并保持其余膜、弯曲、钻转实现不动。\n\n这一步只改一个方向：剪切块的构造口径，而不是同时动 DOF 映射、钻转罚项或积分阶次。\n\n## 预期影响\n\n1. `bending_shear__bending_shear` 误差应显著下降，理想情况下会带动整体 Frobenius 相对误差下降。\n2. 最大绝对误差中的 `uz-uz` 相关条目应首先收敛，因为它们正是剪切/弯曲耦合的典型敏感位置。\n3. 若 Abaqus S4 的目标实现确实采用类似 MITC4 的剪切约束，这一改动的收益会比继续调罚项更直接。\n\n## 回归风险\n\n1. 如果当前实现其实已经在别处隐含做了剪切修正，再引入 MITC4 可能会出现“剪切偏软”，使膜-弯曲耦合误差上升。\n2. 边中点投影若局部坐标方向或节点顺序符号处理不一致，可能把误差从“过硬”变成“符号错位”，导致局部条目波动更大。\n3. 这次改动只针对剪切块，无法直接修正 `drilling__drilling` 的异常，但当前证据表明它不是本轮最优先的总误差驱动项。\n\n## 验证方法\n\n1. 仅修改剪切块实现，保留其他分块与积分口径不变。\n2. 重新跑同一 `sample_001` 的 Catch2 / 数值对齐验证。\n3. 重点比较三项：\n   - `frobenius_relative_error` 是否低于 `0.142174`\n   - `bending_shear__bending_shear` 是否明显下降\n   - `n1.uz <-> n3.uz`、`n2.uz <-> n4.uz` 这些最大绝对误差是否收敛\n4. 若总误差下降但膜块略有波动，仍可接受；本轮只看是否把主误差从剪切路径压下去。",
-      "patch_excerpt": "--- a/src/shell/ShellStiffness.cpp\n+++ b/src/shell/ShellStiffness.cpp\n@@ -233,20 +233,29 @@ ShellStiffnessComponents computeLocalComponents(const ShellElementInput& input, const LocalGeometry& geometry) {\n         addDrillingPenalty(\n             components.drilling, shape, kDrillingPenalty * shearModulus * input.thickness * shape.detJ);\n     }\n \n-    // 横向剪切采用中心点选择性减缩积分，避免薄壳出现严重剪切锁定。\n-    const ShapeData center = evaluateShape(geometry, 0.0, 0.0);\n+    // 横向剪切改为 MITC4 的边中点投影，减少寄生剪切刚度。\n     BMatrix2 shearB{};\n-    for (std::size_t node = 0; node < kNodeCount; ++node) {\n-        const std::size_t base = node * kDofPerNode;\n-        shearB[0][base + 2] = center.dNdx[node];\n-        shearB[0][base + 4] = center.values[node];\n-        shearB[1][base + 2] = center.dNdy[node];\n-        shearB[1][base + 3] = -center.values[node];\n-    }\n-    addBtDB(components.shear, shearB, shearMaterial, 4.0 * center.detJ);\n+    const std::array<std::array<double, 2>, 4> shearPoints = {\n+        std::array<double, 2>{0.0, -1.0},\n+        std::array<double, 2>{1.0, 0.0},\n+        std::array<double, 2>{0.0, 1.0},\n+        std::array<double, 2>{-1.0, 0.0},\n+    };\n+    constexpr std::array<double, 4> shearWeights = {1.0, 1.0, 1.0, 1.0};\n+    for (std::size_t pointIndex = 0; pointIndex < shearPoints.size(); ++pointIndex) {\n+        const ShapeData shearShape = evaluateShape(geometry, shearPoints[pointIndex][0], shearPoints[pointIndex][1]);\n+        for (std::size_t node = 0; node < kNodeCount; ++node) {\n+            const std::size_t base = node * kDofPerNode;\n+            shearB[0][base + 2] += 0.25 * shearShape.dNdx[node];\n+            shearB[0][base + 4] += 0.25 * shearShape.values[node];\n+            shearB[1][base + 2] += 0.25 * shearShape.dNdy[node];\n+            shearB[1][base + 3] += -0.25 * shearShape.values[node];\n+        }\n+        addBtDB(components.shear, shearB, shearMaterial, shearWeights[pointIndex] * shearShape.detJ);\n+        shearB = {};\n+    }\n \n     components.total = addMatrices(addMatrices(components.membrane, components.bending),\n                                    addMatrices(components.shear, components.drilling));\n     return components;\n }"
+      "next_focus": "只检查横向剪切的边中点投影权重与累加方式，确认是否把四个边点的贡献重复/缩放错误地叠加进了单个剪切刚度块。"
     },
     {
       "id": "stage3-20260724-111132:iteration-01",
-      "run_id": "stage3-20260724-111132",
-      "iteration": 1,
-      "before_error": 0.142174,
-      "candidate_error": null,
-      "patch_applied": false,
-      "test_passed": false,
+      "experiment_class": "",
       "accepted": false,
-      "reviewer_decision": "reject",
-      "reviewer_summary": "本轮补丁没有实际应用，`patch dry-run failed`，`patch_applied=false`，`test_passed=false`，也没有候选误差可证明 Frobenius 相对误差下降。当前只停留在理论上要改剪切积分，但未完成可验证实现，因此不满足接受条件。",
       "failure_mechanism": "本轮补丁没有实际应用，`patch dry-run failed`，`patch_applied=false`，`test_passed=false`，也没有候选误差可证明 Frobenius 相对误差下降。当前只停留在理论上要改剪切积分，但未完成可验证实现，因此不满足接受条件。",
       "do_not_repeat": [
         "不得原样重复实验 stage3-20260724-111132:iteration-01 的理论假设和补丁机制"
       ],
-      "next_focus": "先让 `src/shell/ShellStiffness.cpp` 的剪切积分补丁真正应用并通过编译/测试，再用 sample_001 的 Frobenius 相对误差确认是否下降",
-      "theory_excerpt": "**诊断证据**\n\n已知事实：\n- 当前总误差是 `0.142174`，离 `0.01` 目标还有明显距离。\n- 最大绝对误差集中在 `uz-uz` 相关项，尤其是 `n1.uz <-> n3.uz` 和 `n2.uz <-> n4.uz`，实际值 `-336.538e6`，期望 `-224.359e6`，偏差约 `112.179e6`。\n- 分块误差里最突出的不是单纯膜面，而是 `bending_shear__bending_shear = 0.3207`，同时 `drilling__drilling = 27.57` 极大；膜面块误差为 `0.1227`，是次要但仍显著。\n- `membrane_xy__bending_shear`、`bending_shear__membrane_xy`、`membrane_xy__drilling`、`drilling__membrane_xy` 都是 `1.0`，说明当前分块耦合结构和 Abaqus S4 参考并不一致，至少存在某些自由度映射或局部场构造差异。\n- 当前实现中，横向剪切采用了“中心点选择性减缩积分”，而且剪切 B 矩阵只在中心点构造，属于最强的简化近似。\n- `uz-uz` 的最大误差主要出现在跨节点的弯曲/横向剪切相关条目，这与剪切离散口径比与钻转罚项本身更直接相关。\n- Shell203 参考片段明确在弯曲/剪切里使用了更复杂的局部插值和多积分点口径，不是当前实现的中心点单点剪切。\n\n理论推断：\n- 目前误差主源更像是横向剪切离散口径不足，而不是纯膜面材料常数或简单符号错误。原因是最大误差集中在 `uz` 相关的跨节点耦合项，这通常由 `w - theta` 剪切约束主导。\n- 当前 `center` 单点剪切在四节点壳上很容易把剪切刚度分布压得过于粗糙，导致 `uz` 相关块整体偏高或偏低，并且会放大与弯曲的耦合偏差。\n- `drilling__drilling` 很大，但钻转罚项的影响主要在 `rz` 相关自由度，不太可能解释当前最大条目全部落在 `uz` 上，因此它更像次级误差源。\n- 膜面块误差 `0.1227` 说明局部膜刚度也有偏差，但它不足以解释当前最显著的 `uz-uz` 系统性偏差。\n\n待验证假设：\n- 本轮最值得先验证的是“横向剪切的积分口径过于粗糙，单点选择性减缩积分与 Abaqus S4 不一致”，应优先把修正方向放在剪切项的 MITC4/等效多点插值口径，而不是先动钻转罚项。\n\n**单一修正假设**\n\n将当前“中心点单点剪切积分”替换为与 Abaqus S4 更接近的 MITC4 式横向剪切离散口径，是本轮唯一优先改动方向。\n\n**预期影响**\n\n- 最直接影响 `bending_shear__bending_shear` 分块，预计会显著降低 `uz` 相关的最大绝对误差。\n- 由于剪切与弯曲共享 `w/rot` 结构，`membrane_xy__bending_shear`、`bending_shear__membrane_xy` 这类耦合块也可能同步下降。\n- 若该假设成立，总 Frobenius 相对误差应有明显下降，可能是当前最有希望单次带来最大收益的方向。\n\n**回归风险**\n\n- 若 Abaqus S4 在该样本上并非标准 MITC4，而是更接近其他锁定抑制策略，单纯替换剪切口径可能改善 `uz` 块但不一定整体最优。\n- 剪切项改动会改变薄板极限和厚板响应，可能短期内让某些非主导块误差波动。\n- 如果当前主要误差其实来自 DOF 映射或弯曲转角符号，先改剪切可能只能部分见效，但从误差分布看，这个风险低于直接去改钻转罚项。\n\n**验证方法**\n\n1. 只改横向剪切项的离散口径，保持膜面、弯曲、钻转和坐标变换不动。\n2. 重新计算 sample_001 的矩阵，重点观察：\n   - `bending_shear__bending_shear`\n   - `uz-uz` 最大绝对误差条目\n   - `frobenius_relative_error`\n3. 若剪切口径正确，应该看到 `uz` 相关四条最大误差明显收缩，并带动总误差下降。\n4. 若 `uz` 误差几乎不动，则下一轮再转向“弯曲转角符号/DOF 映射”或“钻转罚项标定”。",
-      "patch_excerpt": "--- a/src/shell/ShellStiffness.cpp\n+++ b/src/shell/ShellStiffness.cpp\n@@ -223,10 +223,7 @@ ShellStiffnessComponents computeLocalComponents(const ShellElementInput& input,\n         addBtDB(components.drilling, shape, kDrillingPenalty * shearModulus * input.thickness * shape.detJ);\n     }\n \n-    // 横向剪切采用中心点选择性减缩积分，避免薄壳出现严重剪切锁定。\n-    const ShapeData center = evaluateShape(geometry, 0.0, 0.0);\n     BMatrix2 shearB{};\n-    for (std::size_t node = 0; node < kNodeCount; ++node) {\n-        const std::size_t base = node * kDofPerNode;\n-        shearB[0][base + 2] = center.dNdx[node];\n-        shearB[0][base + 4] = center.values[node];\n-        shearB[1][base + 2] = center.dNdy[node];\n-        shearB[1][base + 3] = -center.values[node];\n+    const std::array<std::array<double, 2>, 4> shearPoints = {\n+        std::array<double, 2>{0.0, -1.0},\n+        std::array<double, 2>{1.0, 0.0},\n+        std::array<double, 2>{0.0, 1.0},\n+        std::array<double, 2>{-1.0, 0.0},\n+    };\n+\n+    // 横向剪切改为四边中点口径，减小中心单点近似带来的剪切失配。\n+    for (const auto& point : shearPoints) {\n+        const ShapeData shearShape = evaluateShape(geometry, point[0], point[1]);\n+        for (std::size_t node = 0; node < kNodeCount; ++node) {\n+            const std::size_t base = node * kDofPerNode;\n+            shearB[0][base + 2] = shearShape.dNdx[node];\n+            shearB[0][base + 4] = shearShape.values[node];\n+            shearB[1][base + 2] = shearShape.dNdy[node];\n+            shearB[1][base + 3] = -shearShape.values[node];\n+        }\n+        addBtDB(components.shear, shearB, shearMaterial, shearShape.detJ);\n+        for (auto& row : shearB) {\n+            row.fill(0.0);\n+        }\n     }\n-    addBtDB(components.shear, shearB, shearMaterial, 4.0 * center.detJ);\n \n     components.total = addMatrices(addMatrices(components.membrane, components.bending),\n                                    addMatrices(components.shear, components.drilling));\n     return components;\n }"
+      "next_focus": "先让 `src/shell/ShellStiffness.cpp` 的剪切积分补丁真正应用并通过编译/测试，再用 sample_001 的 Frobenius 相对误差确认是否下降"
     },
     {
       "id": "stage3-20260724-111132:iteration-02",
-      "run_id": "stage3-20260724-111132",
-      "iteration": 2,
-      "before_error": 0.142174,
-      "candidate_error": null,
-      "patch_applied": false,
-      "test_passed": false,
+      "experiment_class": "",
       "accepted": false,
-      "reviewer_decision": "reject",
-      "reviewer_summary": "本轮补丁未实际应用，`patch_applied=false` 且 `failure=patch dry-run failed`，`test_passed=false`，也没有 `candidate_error`，因此既没有通过 C++/Catch2 验证，也没有任何证据表明 Frobenius 相对误差下降。当前只能视为理论假设和补丁草案，未达到接受条件。",
       "failure_mechanism": "本轮补丁未实际应用，`patch_applied=false` 且 `failure=patch dry-run failed`，`test_passed=false`，也没有 `candidate_error`，因此既没有通过 C++/Catch2 验证，也没有任何证据表明 Frobenius 相对误差下降。当前只能视为理论假设和补丁草案，未达到接受条件。",
       "do_not_repeat": [
         "不得原样重复实验 stage3-20260724-111132:iteration-02 的理论假设和补丁机制"
       ],
-      "next_focus": "先把 `src/shell/ShellStiffness.cpp` 的补丁真正应用并跑通编译与 Catch2，再用 sample_001 的 Frobenius 相对误差做前后对比",
-      "theory_excerpt": "**诊断证据**\n\n已知事实：\n1. 当前主误差是 `Frobenius relative error = 0.142174`，离 0.01 目标还有明显差距。\n2. 最大绝对误差集中在 `uz-uz` 跨节点耦合项，例如 `n1.uz-n3.uz`，实际值 `-3.365e8`，期望 `-2.244e8`，偏差约 `1.122e8`。\n3. 分块误差里最异常的是 `bending_shear__bending_shear = 0.3207`，而 `drilling__drilling = 27.57` 也很大；但膜内块 `membrane_xy__membrane_xy = 0.1227` 仍是次级误差来源。\n4. 交叉块 `membrane_xy__bending_shear`、`bending_shear__membrane_xy`、`membrane_xy__drilling`、`drilling__membrane_xy` 都是 1.0，说明当前实现和 Abaqus S4 在这些耦合结构上基本没有对齐到同一算法口径。\n5. 当前实现对横向剪切采用的是“中心点选择性减缩积分”，而不是明确的 MITC4 剪切插值。\n6. 当前实现的 `uz-uz` 最大误差形态更像是剪切刚度偏大导致的跨节点弯剪耦合过硬，而不是单纯膜内项失配。\n\n理论推断：\n1. 对四节点 Reissner-Mindlin 壳而言，Abaqus S4 的核心差异点往往不在纯膜内 2x2 积分本身，而在横向剪切的 MITC4 处理。\n2. 当前 `bending_shear__bending_shear` 误差显著，且最大条目正落在 `uz` 相关耦合，这与“中心点单点剪切积分”过于刚化、对弯曲模态约束过强的特征一致。\n3. `drilling__drilling` 很大，但钻转罚项通常更多影响局部对角和弱耦合项；它不太像当前主导 `uz-uz` 跨节点误差的第一原因。\n\n待验证假设：\n- 本轮最有可能降低 Frobenius 相对误差的单一改动方向，是把横向剪切从“中心点选择性减缩积分”切换为与 Abaqus S4 更接近的 MITC4 剪切插值口径。\n\n**单一修正假设**\n\n将横向剪切项从当前的中心点单点减缩积分，改为 MITC4 类型的边中点/假想剪切场插值，使剪切应变不再由单一中心点控制。\n\n这是本轮唯一优先假设，不同时改 DOF 映射、不改弯曲转角符号、不改钻转罚项系数。\n\n**预期影响**\n\n1. 主要降低 `bending_shear__bending_shear` 分块误差。\n2. 直接削弱 `uz-uz` 相关过硬条目，尤其是跨对角节点的剪切耦合。\n3. 总体 Frobenius 相对误差大概率出现可见下降，幅度应优于先调钻转罚项或微调膜内积分。\n\n**回归风险**\n\n1. 如果当前局部坐标系或转角符号存在隐藏不一致，单独切换剪切插值后，误差可能只在弯剪块局部移动，而不会明显下降。\n2. MITC4 实现若边中点剪切方向或符号口径与现有局部基底不一致，可能引入新的非对称耦合，但目前对称误差很小，这类风险次于收益。\n3. 钻转块仍会保留较大误差，因此即使本轮有效，整体误差可能还达不到 1%，但应能验证剪切口径是否是主因。\n\n**验证方法**\n\n1. 仅修改横向剪切构造方式，保留膜内、弯曲、钻转不动。\n2. 重新生成 sample_001 刚度矩阵，与 Abaqus S4 对比，重点看：\n   - `bending_shear__bending_shear` 是否显著下降；\n   - `uz-uz` 最大绝对误差是否从 `1.12e8` 明显收缩；\n   - 总 Frobenius 相对误差是否下降到当前值以下。\n3. 若剪切块下降而钻转块仍高，说明下一轮再单独考虑钻转罚项口径；本轮不要同时动多个方向。",
-      "patch_excerpt": "--- a/src/shell/ShellStiffness.cpp\n+++ b/src/shell/ShellStiffness.cpp\n@@ -1,3 +1,4 @@\n #include \"shell/ShellStiffness.hpp\"\n \n #include <algorithm>\n@@ -196,7 +197,7 @@\n     return result;\n }\n \n ShellStiffnessComponents computeLocalComponents(const ShellElementInput& input, const LocalGeometry& geometry) {\n@@ -243,20 +244,31 @@\n         addDrillingPenalty(\n             components.drilling, shape, kDrillingPenalty * shearModulus * input.thickness * shape.detJ);\n     }\n \n-    // 横向剪切采用中心点选择性减缩积分，避免薄壳出现严重剪切锁定。\n-    const ShapeData center = evaluateShape(geometry, 0.0, 0.0);\n     BMatrix2 shearB{};\n-    for (std::size_t node = 0; node < kNodeCount; ++node) {\n-        const std::size_t base = node * kDofPerNode;\n-        shearB[0][base + 2] = center.dNdx[node];\n-        shearB[0][base + 4] = center.values[node];\n-        shearB[1][base + 2] = center.dNdy[node];\n-        shearB[1][base + 3] = -center.values[node];\n+    // 横向剪切改为 MITC4 风格的边中点插值，避免单点中心积分把弯剪耦合做得过硬。\n+    const std::array<ShapeData, 4> shearPoints = {\n+        evaluateShape(geometry, 0.0, -1.0),\n+        evaluateShape(geometry, 1.0, 0.0),\n+        evaluateShape(geometry, 0.0, 1.0),\n+        evaluateShape(geometry, -1.0, 0.0),\n+    };\n+    const std::array<std::array<double, 4>, 2> shearWeights = {{\n+        {{0.5, 0.5, 0.5, 0.5}},\n+        {{0.5, 0.5, 0.5, 0.5}},\n+    }};\n+    for (std::size_t node = 0; node < kNodeCount; ++node) {\n+        const std::size_t base = node * kDofPerNode;\n+        for (std::size_t point = 0; point < shearPoints.size(); ++point) {\n+            const ShapeData& shearShape = shearPoints[point];\n+            shearB[0][base + 2] += shearWeights[0][point] * shearShape.dNdx[node];\n+            shearB[0][base + 4] += shearWeights[0][point] * shearShape.values[node];\n+            shearB[1][base + 2] += shearWeights[1][point] * shearShape.dNdy[node];\n+            shearB[1][base + 3] += -shearWeights[1][point] * shearShape.values[node];\n+        }\n     }\n-    addBtDB(components.shear, shearB, shearMaterial, 4.0 * center.detJ);\n+    const double shearScale = 0.25 * (shearPoints[0].detJ + shearPoints[1].detJ + shearPoints[2].detJ + shearPoints[3].detJ);\n+    addBtDB(components.shear, shearB, shearMaterial, shearScale);\n \n     components.total = addMatrices(addMatrices(components.membrane, components.bending),\n                                    addMatrices(components.shear, components.drilling));\n     return components;\n }"
+      "next_focus": "先把 `src/shell/ShellStiffness.cpp` 的补丁真正应用并跑通编译与 Catch2，再用 sample_001 的 Frobenius 相对误差做前后对比"
     },
     {
       "id": "stage3-20260724-111132:iteration-03",
-      "run_id": "stage3-20260724-111132",
-      "iteration": 3,
-      "before_error": 0.142174,
-      "candidate_error": 0.195192,
-      "patch_applied": true,
-      "test_passed": true,
+      "experiment_class": "",
       "accepted": false,
-      "reviewer_decision": "reject",
-      "reviewer_summary": "本轮补丁已实际应用且 Catch2/脚本测试通过，但核心判据不满足：Frobenius relative error 从 0.142174 上升到 0.195192，未下降，反而明显恶化；`max_absolute_error` 也从 1.12179e8 增至 1.90705e8。虽然没有绕过测试，且变更范围仍局限在 `src/shell/ShellStiffness.cpp`，但按阶段3数值对齐标准不能接受。",
       "failure_mechanism": "本轮补丁已实际应用且 Catch2/脚本测试通过，但核心判据不满足：Frobenius relative error 从 0.142174 上升到 0.195192，未下降，反而明显恶化；`max_absolute_error` 也从 1.12179e8 增至 1.90705e8。虽然没有绕过测试，且变更范围仍局限在 `src/shell/ShellStiffness.cpp`，但按阶段3数值对齐标准不能接受。",
       "do_not_repeat": [
         "不得原样重复实验 stage3-20260724-111132:iteration-03 的理论假设和补丁机制"
       ],
-      "next_focus": "只核对横向剪切投影的边中点坐标与节点顺序/符号约定，先排除剪切 B 矩阵映射错误再继续调参",
-      "theory_excerpt": "## 诊断证据\n\n**已知事实**\n- 当前主误差是 `Frobenius relative error = 0.142174`，远高于目标 `0.01`。\n- 误差分块里，`membrane_xy__membrane_xy = 0.1227`，`bending_shear__bending_shear = 0.3207`，而 `drilling__drilling = 27.57`，说明钻转块数值口径明显失配。\n- 但最大绝对误差条目集中在 `uz-uz` 和 `ux/uy-ux/uy` 的面内/横向刚度对角与耦合项上，尤其 `n1.uz <-> n3.uz` 的实际值比 Abaqus 更硬约 `1.12e8`。\n- 当前实现里，面内和弯曲用 `2x2 Gauss`，横向剪切用中心点选择性减缩积分，钻转罚项是常数 `0.0085` 乘 `G t`，并在 4 个高斯点上积分。\n- 当前 `Shell203` 参考实现显示：剪切相关并不是单纯“中心点 MITC4 选择性减缩”这一层，而是通过中边点/节点插值、`Bmx`/`Q` 类结构进行独立构造；同时钻转项存在与几何/面积相关的口径差异迹象。\n\n**理论推断**\n- 现在最像“第一主误差源”的不是面内本构，而是横向剪切与弯曲转角耦合的插值口径。\n- 证据是 `bending_shear__bending_shear` 已经偏到 `0.3207`，并且最大的绝对误差出现在 `uz` 相关条目，这通常对应 `w-θx/θy` 剪切约束与弯曲旋转场不匹配，而不是纯膜内项。\n- 另一方面，`drilling__drilling` 虽然相对误差很大，但它的绝对范数很小，未必是拉高 Frobenius 的主因；它更像“比例口径不一致”，不是当前误差主导项。\n\n**待验证假设**\n- 当前单一优先修正应是：**把横向剪切从“中心点直接取 `w, θx, θy` 的选择性减缩积分”改为 Abaqus S4 更接近的 MITC4 式剪切插值/投影口径，尤其用边中点约束剪切应变而不是中心点单点采样。**\n\n## 单一修正假设\n\n**假设：当前剪切 B 矩阵的构造口径不对，导致 `uz` 相关刚度和 `bending_shear` 分块系统性偏硬；应优先替换为 MITC4 边中点剪切插值/投影，而不是继续调钻转罚项或膜内积分。**\n\n这是本轮唯一建议给 Developer Agent 落地的方向。\n\n## 预期影响\n\n- 最可能首先降低 `bending_shear__bending_shear` 和 `uz-uz` 相关最大绝对误差。\n- 可能连带改善部分 `membrane_xy__membrane_xy`，因为壳单元的剪切锁定/投影失配会污染整体刚度耦合。\n- 对 `drilling__drilling` 的改善预计有限，不应把这轮收益寄托在钻转项上。\n\n## 回归风险\n\n- 若剪切插值坐标或边中点映射写错，可能让当前 `uz` 误差更大。\n- 如果实现时不保持现有的局部坐标、节点顺序和符号约定，容易引入弯曲转角符号反转，导致 `bending_shear` 继续恶化。\n- 这次改动会直接影响主误差来源，属于高收益高风险修改；但相比改钻转罚项，它更符合当前误差分布。\n\n## 验证方法\n\n1. 只改横向剪切构造，不动膜内、弯曲、钻转常数与积分点数。\n2. 重新生成 `sample_001_cpp.csv`，对比：\n   - `frobenius_relative_error`\n   - `bending_shear__bending_shear`\n   - `n1.uz <-> n3.uz`、`n2.uz <-> n4.uz`\n3. 观察是否出现明确下降：\n   - 若 Frobenius 相对误差明显下降，说明剪切口径是主因；\n   - 若 `uz` 最大误差不降反升，再转向核对弯曲转角符号约定，而不是先动钻转罚项。",
-      "patch_excerpt": "--- a/src/shell/ShellStiffness.cpp\n+++ b/src/shell/ShellStiffness.cpp\n@@ -1,6 +1,6 @@\n #include \"shell/ShellStiffness.hpp\"\n \n #include <algorithm>\n #include <array>\n #include <cmath>\n@@ -233,7 +233,7 @@\n     return result;\n }\n \n Matrix24 transformToGlobal(const Matrix24& local, const LocalGeometry& geometry) {\n@@ -298,21 +298,27 @@\n         addDrillingPenalty(\n             components.drilling, shape, kDrillingPenalty * shearModulus * input.thickness * shape.detJ);\n     }\n \n-    // 横向剪切采用中心点选择性减缩积分，避免薄壳出现严重剪切锁定。\n-    const ShapeData center = evaluateShape(geometry, 0.0, 0.0);\n+    // 横向剪切改为边中点投影口径，降低中心点单点采样带来的剪切过硬。\n     BMatrix2 shearB{};\n-    for (std::size_t node = 0; node < kNodeCount; ++node) {\n-        const std::size_t base = node * kDofPerNode;\n-        shearB[0][base + 2] = center.dNdx[node];\n-        shearB[0][base + 4] = center.values[node];\n-        shearB[1][base + 2] = center.dNdy[node];\n-        shearB[1][base + 3] = -center.values[node];\n+    const std::array<std::array<double, 2>, 4> shearPoints = {\n+        std::array<double, 2>{0.0, -1.0},\n+        std::array<double, 2>{1.0, 0.0},\n+        std::array<double, 2>{0.0, 1.0},\n+        std::array<double, 2>{-1.0, 0.0},\n+    };\n+    for (const auto& point : shearPoints) {\n+        const ShapeData shape = evaluateShape(geometry, point[0], point[1]);\n+        for (std::size_t node = 0; node < kNodeCount; ++node) {\n+            const std::size_t base = node * kDofPerNode;\n+            shearB[0][base + 2] = shape.dNdx[node];\n+            shearB[0][base + 4] = shape.values[node];\n+            shearB[1][base + 2] = shape.dNdy[node];\n+            shearB[1][base + 3] = -shape.values[node];\n+        }\n+        addBtDB(components.shear, shearB, shearMaterial, shape.detJ);\n     }\n-    addBtDB(components.shear, shearB, shearMaterial, 4.0 * center.detJ);\n \n     components.total = addMatrices(addMatrices(components.membrane, components.bending),\n                                    addMatrices(components.shear, components.drilling));\n     return components;\n }"
+      "next_focus": "只核对横向剪切投影的边中点坐标与节点顺序/符号约定，先排除剪切 B 矩阵映射错误再继续调参"
     },
     {
       "id": "stage3-20260724-112148:iteration-01",
-      "run_id": "stage3-20260724-112148",
-      "iteration": 1,
-      "before_error": 0.142174,
-      "candidate_error": null,
-      "patch_applied": false,
-      "test_passed": false,
+      "experiment_class": "",
       "accepted": false,
-      "reviewer_decision": "reject",
-      "reviewer_summary": "本轮没有形成可验证候选实现：`patch_applied` 为 false，`test_passed` 为 false，且 `candidate_error` 为空，原因是 OpenAI API 连接失败后补丁未生成。按接受条件，既没有测试通过，也没有 Frobenius 相对误差下降的实证，因此必须拒绝。",
       "failure_mechanism": "执行链路在补丁生成阶段失败，OpenAI API 连接被远端关闭，导致没有实际应用的 patch、没有候选误差、没有有效测试结果；因此无法证明任何数值改进。",
       "do_not_repeat": [
         "不要再次依赖失败的 API 调用链路直接生成补丁而不先确认可用性",
         "不要在没有 `patch_applied=true` 和 `candidate_error` 的情况下尝试评审接受",
         "不要继续重复已被证伪的横向剪切边中点/MITC4 扩大口径方案"
       ],
-      "next_focus": "先恢复补丁生成与落地链路，拿到真实 `patch_applied=true`、`test_passed=true` 和 `candidate_error` 后，再只检查横向剪切转角符号/DOF 映射这一单点",
-      "theory_excerpt": "我先做历史实验对照和当前误差分布的归因，重点避开已经被证伪的剪切边中点扩大口径，并把诊断收敛到一个最可能的单点修正方向。\n**历史实验检查**\n\n先对跨运行记忆做匹配，和本轮方向最接近的历史实验有三类：\n\n1. `stage3-20260723-095230:iteration-01`\n   - 方向：把横向剪切从中心点单点口径改成边中点采样/平均，接近 MITC4 的剪切投影思路。\n   - 结果：`0.142348 -> 0.195318`，误差显著变差，已被拒绝。\n   - 启示：**“扩大剪切积分口径”本身不是有效方向**，尤其不能再重复边中点求和/平均这一机制。\n\n2. `stage3-20260723-095429:iteration-01`\n   - 方向：钻转罚项从“面内导数 + theta_z”混合罚型改成更纯的节点钻转约束。\n   - 结果：补丁未实际应用，`patch dry-run failed`，无有效候选误差。\n   - 启示：**钻转方向值得怀疑，但这条历史没有提供数值证据**，不能直接当成已验证路径。\n\n3. `stage3-20260724-105751:iteration-03`\n   - 方向：横向剪切改成 MITC4 边中点投影。\n   - 结果：`0.142174 -> 0.251709`，验证失败，明显恶化。\n   - 启示：**MITC4 这个大方向并非不可用，但该实现方式有结构性问题**，尤其像是权重、叠加方式或映射处理出了偏差。不能原样 повтор。\n\n综合来看，历史里最接近本轮的方向都围绕剪切，但已经有明确负反馈：**“边中点积分/投影扩大口径”不该再重来**。现在应转向更基础的离散一致性问题，而不是继续改积分点数量。\n\n---\n\n**诊断证据**\n\n**已知事实**\n\n1. 当前主指标：\n   - Frobenius relative error = `0.142174`\n   - 远高于目标 `0.01`\n\n2. 误差分块：\n   - `membrane_xy__membrane_xy = 0.1227`\n   - `bending_shear__bending_shear = 0.3207`\n   - `drilling__drilling = 27.568`\n   - `membrane_xy__drilling = drilling__membrane_xy = 1.0`\n   - `drilling` 相关块相对误差极大，但其绝对范数很小，未必是总 Frobenius 的主导来源\n\n3. 最大绝对误差条目几乎都集中在：\n   - `n1.uz <-> n3.uz`\n   - `n2.uz <-> n4.uz`\n   - 以及若干 `ux/uy` 跨节点对角耦合项\n   这说明问题不是随机散点，而是**某个固定自由度通道的刚度分配偏差**。\n\n4. 当前实现的关键事实：\n   - 膜和弯曲采用 `2x2 Gauss`\n   - 剪切当前回到了中心点 SRI 口径\n   - 钻转罚项已经简化为仅对 `theta_z / rz` 的节点投影\n   - 代码里弯曲项使用的是标准的 `rx, ry` 导数组合，当前没有明显证据表明弯曲块是首要问题\n\n**理论推断**\n\n1. 由于最大误差集中在 `uz` 相关项，而 `bending_shear__bending_shear` 明显高于膜块，主偏差更像是：\n   - **横向剪切与转角之间的离散耦合仍不一致**\n   - 或者 **剪切/弯曲相关自由度的符号映射有局部错误**\n   而不是纯膜刚度或纯钻转罚项数值大小的问题。\n\n2. 历史上，单纯把剪切从中心点改成边中点积分，误差不降反升，说明问题不在“剪切点数不够”，而更像在：\n   - 剪切应变构造的投影形式\n   - 剪切里 `w-rx/ry` 的方向约定\n   - 或 DOF 到局部壳基的映射一致性\n\n3. 当前 `drilling` 块相对误差很大，但其范数量级比膜和剪切小得多，因此它更像次级污染源，不是当前最可能一击下降总误差的主因。\n\n**待验证假设**\n\n- 当前最可能降低 Frobenius 误差的单点改动，不是继续改剪切积分点，而是**核对并修正横向剪切/弯曲相关自由度映射中的转角符号约定**，优先检查 `rx`、`ry` 在 `gamma_xz/gamma_yz` 中的正负号是否与 Abaqus S4 的局部壳坐标一致。\n- 这条假设比“再换一次 MITC4 积分方案”更基础，也更能解释 `uz` 主导的大误差条目。\n\n---\n\n**单一修正假设**\n\n本轮只选一个方向：\n\n**修正横向剪切项中弯曲转角的符号约定，优先核对 `w-rx/ry` 在局部壳坐标下的正负号映射是否与 Abaqus S4 一致。**\n\n具体含义是：\n- 不改膜积分\n- 不改弯曲积分\n- 不再扩展剪切积分点数量\n- 不动钻转罚项系数\n- 只检查并修正剪切 B 矩阵中转角自由度的符号方向\n\n这是当前最有可能降低 Frobenius 相对误差的单一改动方向，因为它直接对应 `uz` 主导误差和 `bending_shear` 分块失配。\n\n---\n\n**与历史方案的实质差异*\n[已截断 1144 个字符]",
-      "patch_excerpt": "[文件不存在：workflow/runs/stage3-20260724-112148/iteration-01/developer.patch]"
+      "next_focus": "先恢复补丁生成与落地链路，拿到真实 `patch_applied=true`、`test_passed=true` 和 `candidate_error` 后，再只检查横向剪切转角符号/DOF 映射这一单点"
     },
     {
       "id": "stage3-20260724-112148:iteration-02",
-      "run_id": "stage3-20260724-112148",
-      "iteration": 2,
-      "before_error": 0.142174,
-      "candidate_error": null,
-      "patch_applied": false,
-      "test_passed": false,
+      "experiment_class": "",
       "accepted": false,
-      "reviewer_decision": "reject",
-      "reviewer_summary": "本轮没有形成可验证候选实现：`patch_applied` 为 false，`test_passed` 为 false，`candidate_error` 为空，且失败原因是 OpenAI API HTTP 503 导致补丁未落地。按接受条件，既没有测试通过，也没有 Frobenius 相对误差下降的实证，因此必须拒绝。",
       "failure_mechanism": "执行链路在补丁生成/落地阶段失败，OpenAI API 返回 503，导致没有实际应用的 patch、没有候选误差、没有有效测试结果；因此无法证明任何数值改进。",
       "do_not_repeat": [
         "不要再次依赖不稳定的 API 调用链路直接生成补丁而不先确认可用性",
         "不要在没有 `patch_applied=true`、`test_passed=true` 和 `candidate_error` 的情况下尝试评审接受",
         "不要继续重复已被证伪的横向剪切边中点/MITC4 扩大口径方案"
       ],
-      "next_focus": "先恢复补丁生成与落地链路，拿到真实 `patch_applied=true`、`test_passed=true` 和 `candidate_error` 后，再只检查横向剪切转角符号/DOF 映射这一单点",
-      "theory_excerpt": "[文件不存在：workflow/runs/stage3-20260724-112148/iteration-02/theory-analysis.md]",
-      "patch_excerpt": "[文件不存在：workflow/runs/stage3-20260724-112148/iteration-02/developer.patch]"
+      "next_focus": "先恢复补丁生成与落地链路，拿到真实 `patch_applied=true`、`test_passed=true` 和 `candidate_error` 后，再只检查横向剪切转角符号/DOF 映射这一单点"
     },
     {
       "id": "stage3-20260724-112148:iteration-03",
-      "run_id": "stage3-20260724-112148",
-      "iteration": 3,
-      "before_error": 0.142174,
-      "candidate_error": null,
-      "patch_applied": true,
-      "test_passed": false,
+      "experiment_class": "",
       "accepted": false,
-      "reviewer_decision": "reject",
-      "reviewer_summary": "Reviewer 调用或解析失败：OpenAI API connection failed after 3 attempt(s): Remote end closed connection without response",
       "failure_mechanism": "Reviewer 调用或解析失败",
       "do_not_repeat": [
         "不得原样重复实验 stage3-20260724-112148:iteration-03 的理论假设和补丁机制"
       ],
-      "next_focus": "",
-      "theory_excerpt": "我先按历史实验记忆做方向筛选，再只收敛到一个改动假设，不碰代码。接下来我会把最接近本轮的历史方案和它们为什么失败说清楚，然后给出本轮唯一优先的修正点。\n**历史实验检查**\n\n最接近本轮方向的历史实验有三组：\n\n1. `stage3-20260724-105751:iteration-01`\n   结果：把横向剪切从中心点单点 SRI 改成四边中点投影，`patch_applied=true`、`test_passed=true`，但 `candidate_error` 从 `0.142174` 升到 `0.196238`，被拒绝。  \n   结论：**“扩大剪切口径”本身是负向的。**\n\n2. `stage3-20260724-095429:iteration-02`\n   结果：同样是把剪切改成四边中点求和，`candidate_error=0.195318`，比基线更差。  \n   结论：**重复证明了边中点加和式剪切口径不是当前正确方向。**\n\n3. `stage3-20260723-095429:iteration-03`\n   结果：只改钻转罚项，把面内导数从钻转项里去掉，`candidate_error` 从 `0.142348` 降到 `0.142174`，是唯一一次有效下降。  \n   结论：**钻转口径确实有影响，但它不是当前最大误差的主驱动。**\n\n这三组历史里，和本轮最接近的是“横向剪切口径/边中点投影”与“钻转罚项构造”两条线。前者已经两次证伪，后者只有小幅收益，不能解释当前 `uz` 主峰。\n\n---\n\n**诊断证据**\n\n**已知事实**\n1. 当前总误差仍是 `0.142174`，距离 `0.01` 还很远。\n2. 最大绝对误差集中在 `uz-uz` 跨节点项，典型是 `n1.uz <-> n3.uz`、`n2.uz <-> n4.uz`，偏差约 `1.12179e8`。\n3. 分块误差里，`bending_shear__bending_shear = 0.3207`，显著高于膜块 `0.1227`。\n4. `drilling__drilling = 27.57` 很异常，但它的绝对分量范数只有 `1.9e6`，小于膜、剪切主块的量级。\n5. 当前实现的剪切仍是中心点选择性减缩积分，代码里 `shearB` 只在中心点构造。\n6. Shell203 参考里，剪切相关项不是简单中心点单点公式，而是使用了更复杂的边点/局部方向投影结构。\n\n**理论推断**\n1. 当前误差主峰落在 `uz` 相关跨节点耦合，说明问题更像是**位移-转角耦合口径**而不是纯膜面材料参数。\n2. 但历史上已经验证，简单把剪切改成“四边中点加和”会变差，所以当前不是“多加几个积分点”这件事本身。\n3. 更可能的问题是：**剪切应变的 DOF 映射或转角符号，在当前中心点 SRI 里仍然不一致**。也就是说，错的不是“只用中心点”这一事实，而是中心点剪切 B 矩阵里 `w/rx/ry` 的符号、方向或自由度对应关系。\n4. `uz-uz` 主峰和 `bending_shear__bending_shear` 偏大，符合“剪切构造的局部符号/映射错位”特征；这类错误会直接把弯剪耦合刚度推偏，但不一定表现为大规模对称性破坏。\n5. 相比之下，钻转罚项虽然失配严重，但它主要影响 `rz` 相关对角和耦合，不足以单独解释当前最大误差全部压在 `uz` 上。\n\n**待验证假设**\n- 当前最可能有效的一项修正，不是继续扩大剪切积分口径，而是**核对横向剪切里 `uz / rx / ry` 的自由度映射和弯曲转角符号**，确保剪切 B 矩阵的方向约定与 Abaqus S4 一致。\n\n---\n\n**单一修正假设**\n\n**假设：本轮最优先的改动是修正横向剪切中的 DOF 映射与转角符号一致性，而不是改积分点数量或钻转罚项。**\n\n具体目标只限一件事：  \n检查并修正 `gamma_xz / gamma_yz` 中 `uz, rx, ry` 的符号和对应关系，使其和 Abaqus S4 的局部壳坐标约定一致。\n\n这不是重复历史上的“边中点扩剪切口径”失败方案，因为这里关注的是**公式符号与自由度映射**，不是积分点扩展。\n\n---\n\n**与历史方案的实质差异**\n\n1. 和 `stage3-20260724-105751:iteration-01` / `stage3-20260723-095429:iteration-02` 不同，这次不改成边中点求和，也不增加剪切积分点数。\n2. 历史失败点是“离散口径扩大后整体误差变差”，说明几何积分思路不对；本轮假设是“当前剪切公式本身的 DOF 方向约定错了”，属于不同层级的问题。\n3. 与 `stage3-20260723-095429:iteration-03` 的钻转改动也不同，这次不碰 `rz` 罚项，不触及膜内导数项，只针对 `w / rx / ry` 的剪切构造。\n4. 这条路线不会复现旧结果的原因很直接：旧结果失败是因为**积分口径**被改坏；本轮要验证的是**同一积分口径下的符号和映射是否错误**，属于更细一层的校正。\n\n---\n\n**预期影响**\n\n1. 如果判断正确，`\n[已截断 783 个字符]",
-      "patch_excerpt": "--- a/src/shell/ShellStiffness.cpp\n+++ b/src/shell/ShellStiffness.cpp\n@@ -243,22 +243,37 @@\n         addDrillingPenalty(\n             components.drilling, shape, kDrillingPenalty * shearModulus * input.thickness * shape.detJ);\n     }\n \n-    // 横向剪切采用中心点选择性减缩积分，避免薄壳出现严重剪切锁定。\n-    const ShapeData center = evaluateShape(geometry, 0.0, 0.0);\n+    // 横向剪切改为边中点符号投影，先修正剪切自由度的方向一致性。\n     BMatrix2 shearB{};\n-    for (std::size_t node = 0; node < kNodeCount; ++node) {\n-        const std::size_t base = node * kDofPerNode;\n-        shearB[0][base + 2] = center.dNdx[node];\n-        shearB[0][base + 4] = center.values[node];\n-        shearB[1][base + 2] = center.dNdy[node];\n-        shearB[1][base + 3] = -center.values[node];\n+    const std::array<std::array<double, 2>, 4> shearPoints = {\n+        std::array<double, 2>{0.0, -1.0},\n+        std::array<double, 2>{1.0, 0.0},\n+        std::array<double, 2>{0.0, 1.0},\n+        std::array<double, 2>{-1.0, 0.0},\n+    };\n+    const std::array<std::array<double, 2>, 4> shearSigns = {\n+        std::array<double, 2>{1.0, 1.0},\n+        std::array<double, 2>{1.0, -1.0},\n+        std::array<double, 2>{1.0, 1.0},\n+        std::array<double, 2>{1.0, -1.0},\n+    };\n+    for (std::size_t pointIndex = 0; pointIndex < shearPoints.size(); ++pointIndex) {\n+        const ShapeData shape = evaluateShape(geometry, shearPoints[pointIndex][0], shearPoints[pointIndex][1]);\n+        for (std::size_t node = 0; node < kNodeCount; ++node) {\n+            const std::size_t base = node * kDofPerNode;\n+            shearB[0][base + 2] = shearSigns[pointIndex][0] * shape.dNdx[node];\n+            shearB[0][base + 3] = 0.0;\n+            shearB[0][base + 4] = shearSigns[pointIndex][0] * shape.values[node];\n+            shearB[1][base + 2] = shearSigns[pointIndex][1] * shape.dNdy[node];\n+            shearB[1][base + 3] = -shearSigns[pointIndex][1] * shape.values[node];\n+            shearB[1][base + 4] = 0.0;\n+        }\n+        addBtDB(components.shear, shearB, shearMaterial, 0.25 * shape.detJ);\n+        for (auto& row : shearB) {\n+            row.fill(0.0);\n+        }\n     }\n-    addBtDB(components.shear, shearB, shearMaterial, 4.0 * center.detJ);\n \n     components.total = addMatrices(addMatrices(components.membrane, components.bending),\n                                    addMatrices(components.shear, components.drilling));\n     return components;\n }\n \n } // namespace"
+      "next_focus": ""
     },
     {
       "id": "stage3-lg-20260724-113704:iteration-01",
-      "run_id": "stage3-lg-20260724-113704",
-      "iteration": 1,
-      "before_error": 0.142174,
-      "candidate_error": 0.25516,
-      "patch_applied": true,
-      "test_passed": false,
+      "experiment_class": "",
       "accepted": false,
-      "reviewer_decision": "reject",
-      "reviewer_summary": "补丁已实际应用且 `scripts/run_stage3.sh` 运行到 Catch2，但验证失败：`frobeniusRelative` 从基线 `0.142174` 恶化到 `0.25516`，明确不满足“实际误差下降”的接受条件。测试也未通过，失败点是 `error.frobeniusRelative < 0.2`。这不是绕过测试，而是数值结果直接否定了当前剪切符号修改。",
       "failure_mechanism": "把横向剪切项中 `shearB[1][base + 3]` 从 `-center.values[node]` 改成 `center.values[node]`，等价于反转了 `ry/theta_y` 在 `gamma_yz` 里的符号约定，但这次改动没有带来局部修正，反而把 `uz` 主导的弯剪耦合整体推偏，导致 Frobenius 误差显著上升并触发基线改进断言失败。",
       "do_not_repeat": [
         "不要再次原样尝试只翻转 `gamma_yz` 中 `ry/theta_y` 符号而不核对整个剪切公式",
         "不要在没有先确认 `uz / rx / ry` 局部约定的情况下继续做单行符号修补",
         "不要把剪切符号修正和积分口径变更混在同一轮里"
       ],
-      "next_focus": "只核对横向剪切里 `uz / rx / ry` 的局部坐标和 DOF 映射约定，先证明当前中心点 SRI 下的符号链路是否与 Abaqus S4 一致，再决定是否继续改剪切公式",
-      "theory_excerpt": "## 历史实验检查\n\n先看和本轮最接近的历史方向：\n\n1. `stage3-20260724-105751:iteration-01` 和 `iteration-03`\n   - 都在改横向剪切口径，分别试了边中点投影、MITC4 风格投影。\n   - 结果都变差，误差从 `0.142174` 升到 `0.196238`、`0.251709`、`0.195192` 这一级。\n   - 结论：**继续扩展剪切积分口径不是本轮该走的路**。\n\n2. `stage3-20260723-095429:iteration-03`\n   - 改的是钻转罚项构造，曾把误差从 `0.142348` 小幅降到 `0.142174`。\n   - 这是历史里唯一一次明确朝正确方向的小幅下降。\n   - 结论：**钻转口径有影响，但不是当前 `uz` 主误差的第一驱动**。\n\n3. `stage3-20260724-112148:iteration-03`\n   - 方向已经转到“横向剪切的转角符号 / DOF 映射”层面。\n   - 这条历史没有数值上成功，但它和当前误差形态比“再换积分点”更贴近。\n   - 结论：**本轮最接近且未被证伪的，是剪切自由度映射/符号一致性，而不是积分点数量**。\n\n## 诊断证据\n\n**已知事实**\n- 总 Frobenius 相对误差是 `0.142174`。\n- 最大绝对误差几乎都落在 `uz-uz` 跨节点耦合项上，典型条目是 `n1.uz <-> n3.uz`、`n2.uz <-> n4.uz`，偏差约 `1.12e8`。\n- 分块误差里 `bending_shear__bending_shear = 0.3207`，明显高于膜块 `0.1227`。\n- `drilling__drilling = 27.57` 很大，但它的绝对量级远小于膜和剪切主块，难以单独解释总误差主峰。\n- 当前实现里，剪切仍是中心点 SRI，`shearB` 只直接用 `w, rx, ry` 构造。\n- 当前对称性误差极低，说明不是整体矩阵破坏，而更像某个局部离散口径偏了。\n\n**理论推断**\n- 误差主峰在 `uz` 相关条目，且剪切块偏大，最像的是 **横向剪切中的转角符号或局部 DOF 映射不一致**。\n- 既然边中点 / MITC4 型扩大口径已经两次被证伪，问题更可能不是“取点方式不够复杂”，而是**同一剪切公式里 `w / rx / ry` 的方向约定错了**。\n- 这比继续调钻转罚项更直接，因为当前最大误差不在 `rz` 主导的块上。\n\n## 单一修正假设\n\n**本轮只修正一件事：核对并修正横向剪切项中 `uz / rx / ry` 的符号和自由度映射，使其与 Abaqus S4 的局部壳坐标约定一致。**\n\n这不是重复历史上的“扩展剪切积分口径”方案。  \n本轮不改积分点数量，不改膜内/弯曲积分，不改钻转罚项系数，只改剪切 B 矩阵里自由度方向的一致性。\n\n## 与历史方案的实质差异\n\n- 和 `stage3-20260724-105751:iteration-01/03` 不同：不再把剪切从中心点改成边中点或 MITC4 投影，所以不会复现那种“口径扩大但误差变差”的机制。\n- 和 `stage3-20260723-095429:iteration-03` 不同：不碰钻转罚项，避免把当前主要的 `uz` 误差源和 `rz` 次级误差源混在一起。\n- 这次关注的是**同一剪切口径下的符号和映射**，不是改变口径本身。\n\n## 预期影响\n\n- 最可能先压低 `bending_shear__bending_shear`。\n- `n1.uz <-> n3.uz`、`n2.uz <-> n4.uz` 这类最大绝对误差有机会收缩。\n- 若判断正确，Frobenius 相对误差应出现可见下降；即使不能一步到 1%，也比继续动积分点更有信息增益。\n\n## 回归风险\n\n- 如果实际问题不在剪切符号，而在钻转耦合或局部基底构造，单改符号收益会有限。\n- 若 `rx/ry` 的局部方向约定和当前实现已经一致，错误修正可能只带来很小变化，甚至局部块轻微波动。\n- 这一步仍然只动一个自由度通道，风险可控，但不能和剪切积分口径一起改。\n\n## 验证方法\n\n1. 只改横向剪切里 `uz / rx / ry` 的符号映射，其他块保持不动。\n2. 重新跑 `sample_001`，重点看：\n   - `frobenius_relative_error`\n   - `bending_shear__bending_shear`\n   - `n1.uz <-> n3.uz`、`n2.uz <-> n4.uz`\n3. 接受标准只有一个：总误差必须比 `0.142174` 更低，且 `uz` 主峰要同步收缩。",
-      "patch_excerpt": "--- a/src/shell/ShellStiffness.cpp\n+++ b/src/shell/ShellStiffness.cpp\n@@ -245,17 +245,16 @@ ShellStiffnessComponents computeLocalComponents(const ShellElementInput& input, const LocalGeometry& geometry) {\n     }\n \n-    // 横向剪切采用中心点选择性减缩积分，避免薄壳出现严重剪切锁定。\n     const ShapeData center = evaluateShape(geometry, 0.0, 0.0);\n     BMatrix2 shearB{};\n     for (std::size_t node = 0; node < kNodeCount; ++node) {\n         const std::size_t base = node * kDofPerNode;\n         shearB[0][base + 2] = center.dNdx[node];\n         shearB[0][base + 4] = center.values[node];\n         shearB[1][base + 2] = center.dNdy[node];\n-        shearB[1][base + 3] = -center.values[node];\n+        shearB[1][base + 3] = center.values[node];\n     }\n     addBtDB(components.shear, shearB, shearMaterial, 4.0 * center.detJ);\n \n     components.total = addMatrices(addMatrices(components.membrane, components.bending),\n                                    addMatrices(components.shear, components.drilling));\n     return components;\n }"
+      "next_focus": "只核对横向剪切里 `uz / rx / ry` 的局部坐标和 DOF 映射约定，先证明当前中心点 SRI 下的符号链路是否与 Abaqus S4 一致，再决定是否继续改剪切公式"
     },
     {
       "id": "stage3-lg-20260724-124433:iteration-01",
-      "run_id": "stage3-lg-20260724-124433",
-      "iteration": 1,
-      "before_error": 0.142174,
-      "candidate_error": 0.25516,
-      "patch_applied": true,
-      "test_passed": false,
+      "experiment_class": "",
       "accepted": false,
-      "reviewer_decision": "reject",
-      "reviewer_summary": "测试未通过：`shell_stage1_tests` 在 `error.frobeniusRelative < 0.2` 处失败，实际 Frobenius 相对误差为 `0.25516`，从基线 `0.142174` 明显恶化。补丁只改了 `src/shell/ShellStiffness.cpp` 的横向剪切符号，但结果没有带来真实误差下降，反而扩大了偏差；对称性仍然很好，说明不是测试绕过，而是离散口径方向错误。",
       "failure_mechanism": "把横向剪切中 `shearB[1][base + 3]` 的符号从负改正，等价于翻转 `gamma_yz` 里转角项的约定，但这个单行修补与当前实现的局部壳坐标/DOF 映射不一致，直接把 `uz` 主导的弯剪耦合推偏，导致 Frobenius 误差从 0.142174 上升到 0.25516，并触发 Catch2 基线改进断言失败。",
       "do_not_repeat": [
         "不要再次原样尝试只翻转 `gamma_yz` 中 `ry/theta_y` 符号而不核对整条剪切公式",
         "不要在没有先确认 `uz / rx / ry` 局部约定的情况下继续做单行符号修补",
         "不要把剪切符号修正和积分口径变更混在同一轮里"
       ],
-      "next_focus": "只核对横向剪切里 `uz / rx / ry` 的局部坐标和 DOF 映射约定，先证明当前中心点 SRI 下的符号链路是否与 Abaqus S4 一致，再决定是否继续改剪切公式",
-      "theory_excerpt": "**历史实验检查**\n\n先对跨运行记忆做对照。和本轮最接近的失败方案有三类：\n\n1. `stage3-20260724-105751:iteration-03`  \n   方向是把横向剪切改成 MITC4 边中点投影。结果是 `0.142174 -> 0.251709`，明确恶化。  \n   这说明“继续扩展剪切积分口径”已经被证伪，不能原样重复。\n\n2. `stage3-20260724-105751:iteration-01` / `stage3-20260723-095230:iteration-01`  \n   方向是把剪切从中心点 SRI 改成边中点/多点采样。结果同样恶化到 `0.196238`、`0.195318`。  \n   这说明不是“点数不够”，而是剪切离散口径本身不对。\n\n3. `stage3-20260723-095429:iteration-03`  \n   方向是收紧钻转罚项口径，曾把误差从 `0.142348` 小幅降到 `0.142174`。  \n   这是唯一有正收益的历史，但收益很小，且不能解释当前 `uz` 主峰。\n\n结论很明确：本轮不能再走“扩大剪切积分/投影”的老路。应转向更基础的离散一致性问题。\n\n**诊断证据**\n\n**已知事实**\n\n- 当前 Frobenius 相对误差是 `0.142174`，离目标 `0.01` 还有明显距离。\n- 最大绝对误差集中在 `n1.uz-n3.uz`、`n2.uz-n4.uz` 这类跨节点 `uz-uz` 项，偏差约 `1.12e8`。\n- 分块误差里，`bending_shear__bending_shear = 0.3207` 明显高于膜块 `0.1227`。\n- `drilling__drilling = 27.57` 很异常，但它的绝对范数小于膜和剪切主块，未必是总误差主因。\n- 当前实现里，横向剪切仍是中心点选择性减缩积分，`shearB` 只直接用 `w, rx, ry` 构造。\n- 对称性误差极低，说明不是整体矩阵结构坏掉，而更像某个自由度通道的符号或映射偏了。\n\n**理论推断**\n\n- 误差主峰落在 `uz` 相关跨节点耦合上，且剪切块偏大，最像的是横向剪切里 `w / rx / ry` 的局部 DOF 映射或转角符号不一致。\n- 既然边中点 / MITC4 型扩大口径已经两次被证伪，问题更可能不是“取点方式不够复杂”，而是**同一剪切公式里自由度方向约定错了**。\n- 这比继续动钻转罚项更直接，因为当前最大误差不在 `rz` 主导块上。\n\n**待验证假设**\n\n- 当前最可能降低 Frobenius 误差的单点改动，是**修正横向剪切中 `uz / rx / ry` 的符号和自由度映射，使其与 Abaqus S4 的局部壳坐标约定一致**。\n\n**单一修正假设**\n\n本轮只选一个方向：\n\n**修正横向剪切项中弯曲转角的符号约定，优先核对 `w-rx/ry` 在局部壳坐标下的正负号映射是否与 Abaqus S4 一致。**\n\n这不是重复历史上的“边中点投影”方案，因为这里不改积分点数量，不扩展剪切口径，不触碰膜内、弯曲或钻转罚项，只修剪切 B 矩阵里自由度方向的一致性。\n\n**与历史方案的实质差异**\n\n- 不再把剪切从中心点改成边中点或 MITC4 投影，所以不会复现“口径扩大但误差变差”的机制。\n- 不碰钻转罚项，避免把 `uz` 主误差和 `rz` 次级误差混在一起。\n- 关注的是**同一剪切口径下的符号和映射**，不是改变口径本身。\n\n**预期影响**\n\n- 最有可能先压低 `bending_shear__bending_shear`。\n- `n1.uz-n3.uz`、`n2.uz-n4.uz` 这类最大绝对误差有机会收缩。\n- 如果判断正确，Frobenius 相对误差应出现可见下降；即使不能一步到 1%，也比继续动积分点更有信息增益。\n\n**回归风险**\n\n- 如果实际问题不在剪切符号，而在钻转耦合或局部基底构造，收益会有限。\n- 若 `rx/ry` 的局部方向约定和当前实现已经一致，修正幅度可能很小，甚至只改变局部块波动。\n- 这一步只动一个自由度通道，风险可控，但不能和剪切积分口径一起改。\n\n**验证方法**\n\n1. 只改横向剪切里 `uz / rx / ry` 的符号映射，其他块保持不动。\n2. 重新跑 `sample_001`。\n3. 重点看三项：\n   - `frobenius_relative_error`\n   - `bending_shear__bending_shear`\n   - `n1.uz-n3.uz`、`n2.uz-n4.uz`\n4. 接受标准只有一个：总误差必须比 `0.142174` 更低，且 `uz` 主峰要同步收缩。",
-      "patch_excerpt": "--- a/src/shell/ShellStiffness.cpp\n+++ b/src/shell/ShellStiffness.cpp\n@@ -241,20 +241,24 @@ ShellStiffnessComponents computeLocalComponents(const ShellElementInput& input, const LocalGeometry& geometry) {\n         addDrillingPenalty(\n             components.drilling, shape, kDrillingPenalty * shearModulus * input.thickness * shape.detJ);\n     }\n \n-    // 横向剪切采用中心点选择性减缩积分，避免薄壳出现严重剪切锁定。\n+    // 横向剪切只修正中心点处的转角符号约定，不改积分口径。\n     const ShapeData center = evaluateShape(geometry, 0.0, 0.0);\n     BMatrix2 shearB{};\n     for (std::size_t node = 0; node < kNodeCount; ++node) {\n         const std::size_t base = node * kDofPerNode;\n         shearB[0][base + 2] = center.dNdx[node];\n         shearB[0][base + 4] = center.values[node];\n         shearB[1][base + 2] = center.dNdy[node];\n-        shearB[1][base + 3] = -center.values[node];\n+        shearB[1][base + 3] = center.values[node];\n     }\n     addBtDB(components.shear, shearB, shearMaterial, 4.0 * center.detJ);\n \n     components.total = addMatrices(addMatrices(components.membrane, components.bending),\n                                    addMatrices(components.shear, components.drilling));\n     return components;\n }\n \n } // namespace"
+      "next_focus": "只核对横向剪切里 `uz / rx / ry` 的局部坐标和 DOF 映射约定，先证明当前中心点 SRI 下的符号链路是否与 Abaqus S4 一致，再决定是否继续改剪切公式"
     },
     {
       "id": "stage3-lg-20260724-124433:iteration-02",
-      "run_id": "stage3-lg-20260724-124433",
-      "iteration": 2,
-      "before_error": 0.142174,
-      "candidate_error": null,
-      "patch_applied": false,
-      "test_passed": false,
+      "experiment_class": "",
       "accepted": false,
-      "reviewer_decision": "reject",
-      "reviewer_summary": "本轮没有可接受的数值证据。候选实现虽然给出了单行剪切符号修改，但本轮事实明确是 `patch_applied=false`、`test_passed=false`、`candidate_error=null`，连可验证候选都没有形成；因此既不满足“测试通过”，也不满足“Frobenius 相对误差实际下降”。同时，这一轮还沿用了已经被历史实验证伪的单行剪切符号修补方向。",
       "failure_mechanism": "补丁未落地，测试未运行到有效候选结果，无法证明误差下降；并且所选修正方向属于已被多轮历史否定的横向剪切单行符号修补，继续沿此路径会重复此前的失败机制。",
       "do_not_repeat": [
         "不要再次原样重复横向剪切里单行翻转 `gamma_yz`/`ry` 符号的修补",
         "不要在没有 `patch_applied=true`、`test_passed=true`、`candidate_error` 的情况下做接受判断",
         "不要继续沿已证伪的剪切积分口径或单符号修补路径扩改"
       ],
-      "next_focus": "先把补丁生成与落地链路恢复到可验证状态，然后只检查横向剪切自由度映射与局部坐标约定是否一致，避免继续做未验证的单行符号修补",
-      "theory_excerpt": "## 历史实验检查\n\n先对跨运行历史记忆做筛选，和本轮最接近的失败方案主要有三类：\n\n1. `stage3-20260724-105751:iteration-01` / `iteration-03`\n   - 方向：把横向剪切从中心点单点 SRI 改成边中点/MITC4 类投影。\n   - 结果：误差从 `0.142174` 明显恶化到 `0.196238`、`0.251709`、`0.195192`。\n   - 结论：**继续扩大剪切积分口径已经被证伪**，不能原样重复。\n\n2. `stage3-20260724-111132:iteration-03` / `stage3-lg-20260724-113704:iteration-01`\n   - 方向：只改横向剪切里转角符号，尝试修 `gamma_yz`/`ry` 约定。\n   - 结果：`0.142174 -> 0.25516`，明显变差。\n   - 结论：**单行翻符号修补也被证伪**，尤其不能再只改 `gamma_yz` 而不核对整条 DOF 映射。\n\n3. `stage3-20260723-095429:iteration-03`\n   - 方向：改钻转罚项，从混合罚型收成更纯的 `theta_z` 约束。\n   - 结果：`0.142348 -> 0.142174`，这是目前唯一一次真实下降。\n   - 结论：钻转项有影响，但收益很小，且不是当前 `uz` 主峰的第一驱动。\n\n## 诊断证据\n\n**已知事实**\n- 当前主目标是 Abaqus S4，当前 Frobenius 相对误差 `0.142174`，离 `0.01` 很远。\n- 最大绝对误差高度集中在 `uz-uz` 跨节点耦合项，典型是 `n1.uz-n3.uz`、`n2.uz-n4.uz`，偏差约 `1.12e8`。\n- 分块误差里最显著的是 `bending_shear__bending_shear = 0.3207`，其次才是 `membrane_xy__membrane_xy = 0.1227`。\n- `drilling__drilling = 27.57` 很大，但绝对范数只有 `1.9e6` 量级，未必是主导总 Frobenius 的来源。\n- 当前实现是：膜/弯曲 `2x2 Gauss`，横向剪切中心点 SRI，钻转罚项 `alpha=0.0085`。\n\n**理论推断**\n- 当前主偏差更像是**横向剪切与弯曲转角的离散一致性问题**，而不是纯膜内刚度问题。\n- 但历史已经证明：  \n  - 扩大剪切积分点数会变差；  \n  - 单独翻 `gamma_yz` 符号也会变差。  \n  所以问题不是“点数不够”或“某一个转角符号单独翻转”，而更可能是**剪切自由度映射/局部坐标约定的整体一致性**。\n- 当前最大误差主要在 `uz`，这比钻转块更像是 `w-rx-ry` 这一通道的方向约定有问题。\n- Shell203 参考里剪切相关项明显依赖局部方向向量和投影构造，不是简单的中心点单项公式；这进一步支持“**映射一致性**”而不是“**改积分口径**”。\n\n## 单一修正假设\n\n**本轮唯一优先假设：修正横向剪切项中 `uz / rx / ry` 的局部 DOF 映射与转角符号链路，使其与 Abaqus S4 的局部壳坐标约定一致。**\n\n这里的含义很具体：\n- 不改膜积分\n- 不改弯曲积分\n- 不改钻转罚项系数\n- 不扩展剪切积分点数\n- 只核对并修正剪切 B 矩阵里 `w, rx, ry` 到 `gamma_xz / gamma_yz` 的对应关系\n\n这是本轮最有可能降低 Frobenius 相对误差的单一方向，因为它直接对应当前 `uz` 主峰和 `bending_shear` 块失配。\n\n## 与历史方案的实质差异\n\n- 和 `stage3-20260724-105751:iteration-01/03` 不同，这次**不再改剪切积分点/投影口径**，所以不会复现“边中点/MITC4 扩大口径导致误差变差”的机制。\n- 和 `stage3-20260724-111132:iteration-03`、`stage3-lg-20260724-113704:iteration-01` 不同，这次**不做单行翻符号**，而是核对 `uz / rx / ry` 的整体映射与局部坐标约定。\n- 和 `stage3-20260723-095429:iteration-03` 不同，这次不碰钻转罚项，避免把 `rz` 的次级问题混进来。\n- 这条路线不会复现旧结果，因为旧结果失败的根因是“**局部公式被单点或单符号改坏**”，而本轮要验证的是“**剪切通道的自由度对应关系本身是否错位**”。\n\n## 预期影响\n\n1. 如果判断正确，`bending_shear__bending_shear` 应先下降。\n2. `n1.uz-n3.uz`、`n2.uz-n4.uz` 这类最大绝对误差有机会收缩。\n3. 总 Frobenius 相对误差有机会出现可见下降，即使不一定一步到 `0.01`，也应优于继续动积分点或再翻单个符号。\n\n## 回归风险\n\n- 如果真实问题其实在钻转耦合或局部基底构造，而不\n[已截断 350 个字符]",
-      "patch_excerpt": "--- a/src/shell/ShellStiffness.cpp\n+++ b/src/shell/ShellStiffness.cpp\n@@ -241,20 +241,22 @@\n         addDrillingPenalty(\n             components.drilling, shape, kDrillingPenalty * shearModulus * input.thickness * shape.detJ);\n     }\n \n-    // 横向剪切采用中心点选择性减缩积分，避免薄壳出现严重剪切锁定。\n+    // 横向剪切保持中心点口径，仅修正局部自由度映射的一致性。\n     const ShapeData center = evaluateShape(geometry, 0.0, 0.0);\n     BMatrix2 shearB{};\n     for (std::size_t node = 0; node < kNodeCount; ++node) {\n         const std::size_t base = node * kDofPerNode;\n         shearB[0][base + 2] = center.dNdx[node];\n         shearB[0][base + 4] = center.values[node];\n         shearB[1][base + 2] = center.dNdy[node];\n-        shearB[1][base + 3] = -center.values[node];\n+        shearB[1][base + 3] = center.values[node];\n     }\n     addBtDB(components.shear, shearMaterial, 4.0 * center.detJ);\n \n     components.total = addMatrices(addMatrices(components.membrane, components.bending),\n                                    addMatrices(components.shear, components.drilling));\n     return components;\n }\n \n } // namespace"
+      "next_focus": "先把补丁生成与落地链路恢复到可验证状态，然后只检查横向剪切自由度映射与局部坐标约定是否一致，避免继续做未验证的单行符号修补"
     },
     {
       "id": "stage3-lg-20260724-124433:iteration-03",
-      "run_id": "stage3-lg-20260724-124433",
-      "iteration": 3,
-      "before_error": 0.142174,
-      "candidate_error": 0.25516,
-      "patch_applied": true,
-      "test_passed": false,
+      "experiment_class": "",
       "accepted": false,
-      "reviewer_decision": "reject",
-      "reviewer_summary": "补丁已实际应用且测试可执行，但结果明确恶化：Frobenius relative error 从 0.142174 上升到 0.25516，Catch2 也在 `error.frobeniusRelative < 0.2` 处失败。对称性误差仍然很小，说明不是绕过测试，而是该单行剪切符号改动的数值方向错误。",
       "failure_mechanism": "把横向剪切中 `shearB[1][base + 3]` 从负号改成正号，单独翻转了 `gamma_yz` 里转角项的约定，但这与当前局部壳坐标/DOF 映射不一致，直接把 `uz` 主导的弯剪耦合推偏，导致总误差显著上升并触发基线改进断言失败。",
       "do_not_repeat": [
         "不要再次原样尝试只翻转 `gamma_yz` 中 `ry/theta_y` 符号而不核对整条剪切公式",
         "不要在没有先确认 `uz / rx / ry` 局部约定的情况下继续做单行符号修补",
         "不要把剪切符号修正和积分口径变更混在同一轮里"
       ],
-      "next_focus": "只核对横向剪切里 `uz / rx / ry` 的局部坐标和 DOF 映射约定，先证明当前中心点 SRI 下的符号链路是否与 Abaqus S4 一致，再决定是否继续改剪切公式",
-      "theory_excerpt": "我先把历史实验和当前误差分布对齐，重点排除已经被证伪的剪切扩大口径，再收敛到一条本轮唯一可落地的假设。\n## 历史实验检查\n\n先看和本轮最接近的历史实验，结论很明确：\n\n1. `stage3-20260724-105751:iteration-01` / `iteration-03`\n   - 方向：把横向剪切从中心点 SRI 改成边中点 / MITC4 类投影。\n   - 结果：误差从 `0.142174` 明显恶化到 `0.196238`、`0.251709`、`0.195192`。\n   - 结论：**继续扩大剪切积分口径已被证伪，不能原样重复。**\n\n2. `stage3-lg-20260724-113704:iteration-01`\n   - 方向：只翻转横向剪切里 `gamma_yz` 的单行符号。\n   - 结果：`0.142174 -> 0.25516`，明显变差。\n   - 结论：**单行剪切符号修补也已被证伪。**\n\n3. `stage3-20260723-095429:iteration-03`\n   - 方向：收紧钻转罚项构造，去掉面内导数混合。\n   - 结果：`0.142348 -> 0.142174`，这是唯一一次真实下降。\n   - 结论：**钻转项确实有影响，但收益小，不是当前主峰来源。**\n\n综合起来，本轮不应再走“改积分点数量”或“单行翻符号”这两条老路。\n\n## 诊断证据\n\n**已知事实**\n\n- 当前 Abaqus S4 对齐基线误差是 `frobenius_relative_error = 0.142174`，距离 `0.01` 还远。\n- 最大绝对误差集中在 `uz-uz` 跨节点项，典型是 `n1.uz <-> n3.uz`、`n2.uz <-> n4.uz`，偏差约 `1.12e8`。\n- 分块误差里：\n  - `membrane_xy__membrane_xy = 0.1227`\n  - `bending_shear__bending_shear = 0.3207`\n  - `drilling__drilling = 27.57`\n- 当前实现中，面内/弯曲是 `2x2 Gauss`，横向剪切是中心点 SRI，钻转罚项是 `alpha=0.0085`。\n- 现在的最大偏差主要落在 `uz` 相关和面内对角/邻接项，不像纯膜材料常数问题。\n\n**理论推断**\n\n- `uz` 主峰和 `bending_shear__bending_shear` 偏大，说明主误差更像是**横向剪切与弯曲转角的离散一致性问题**，而不是单纯膜内或钻转系数。\n- 但历史已经证明：\n  - 扩大剪切积分口径会变差；\n  - 单行翻剪切符号也会变差。\n- 所以问题更可能不是“点数不够”或“单个符号翻错”，而是**当前剪切通道的局部 DOF 映射 / 坐标约定整体不一致**。\n- 这比继续改钻转罚项更贴近最大误差条目，因为当前主峰压在 `uz` 通道，而不是 `rz` 主导块。\n\n## 单一修正假设\n\n**本轮唯一优先假设：修正横向剪切项中 `uz / rx / ry` 的局部 DOF 映射与转角符号链路，使其与 Abaqus S4 的局部壳坐标约定一致。**\n\n这条假设只做一件事：\n- 不改膜积分\n- 不改弯曲积分\n- 不扩展剪切积分点数\n- 不碰钻转罚项系数\n- 只核对并修正剪切 B 矩阵里 `w, rx, ry` 到 `gamma_xz / gamma_yz` 的对应关系\n\n## 与历史方案的实质差异\n\n- 和 `stage3-20260724-105751:iteration-01/03` 不同，这次不改剪切积分口径，不再引入边中点或 MITC4 投影。\n- 和 `stage3-lg-20260724-113704:iteration-01` 不同，这次不做单行翻符号，而是核对 `uz / rx / ry` 的整体映射和局部坐标约定。\n- 和钻转改动不同，这次不触碰 `rz` 罚项，避免把次级误差源和主误差源混在一起。\n- 也就是说，这轮不是“再试一种剪切离散法”，而是**先确认当前中心点 SRI 里剪切自由度映射到底是不是对的**。\n\n## 预期影响\n\n- 如果判断正确，`bending_shear__bending_shear` 应先下降。\n- `n1.uz <-> n3.uz`、`n2.uz <-> n4.uz` 这类最大绝对误差有机会同步收缩。\n- 总 Frobenius 相对误差应出现可见下降；即使不一步到 `0.01`，也应优于继续动积分点或单符号修补。\n\n## 回归风险\n\n- 如果真实问题其实在钻转耦合或局部基底构造，而不是剪切映射，这一步收益会有限。\n- 若 `rx/ry` 的局部方向约定和当前实现已经一致，修正幅度可能很小。\n- 这一步只能验证剪切通道的映射一致性，不能同时覆盖所有误差源。\n\n## 验证方法\n\n1. 只改横向剪切里 `uz / rx / ry` 的符号映射和对应关系，其他块不动。\n2. 重新跑 `sample_001`。\n3. 重点看三项：\n   - `frobenius_relative_error`\n   - `bending_shear__bendi\n[已截断 90 个字符]",
-      "patch_excerpt": "--- a/src/shell/ShellStiffness.cpp\n+++ b/src/shell/ShellStiffness.cpp\n@@ -241,20 +241,21 @@\n         addDrillingPenalty(\n             components.drilling, shape, kDrillingPenalty * shearModulus * input.thickness * shape.detJ);\n     }\n \n-    // 横向剪切采用中心点选择性减缩积分，避免薄壳出现严重剪切锁定。\n+    // 横向剪切保持中心点口径，仅修正局部自由度映射的一致性。\n     const ShapeData center = evaluateShape(geometry, 0.0, 0.0);\n     BMatrix2 shearB{};\n     for (std::size_t node = 0; node < kNodeCount; ++node) {\n         const std::size_t base = node * kDofPerNode;\n         shearB[0][base + 2] = center.dNdx[node];\n         shearB[0][base + 4] = center.values[node];\n         shearB[1][base + 2] = center.dNdy[node];\n-        shearB[1][base + 3] = -center.values[node];\n+        shearB[1][base + 3] = center.values[node];\n     }\n     addBtDB(components.shear, shearB, shearMaterial, 4.0 * center.detJ);\n \n     components.total = addMatrices(addMatrices(components.membrane, components.bending),\n                                    addMatrices(components.shear, components.drilling));\n     return components;\n }\n \n } // namespace"
+      "next_focus": "只核对横向剪切里 `uz / rx / ry` 的局部坐标和 DOF 映射约定，先证明当前中心点 SRI 下的符号链路是否与 Abaqus S4 一致，再决定是否继续改剪切公式"
     },
     {
       "id": "stage3-lg-20260724-133115:iteration-01",
-      "run_id": "stage3-lg-20260724-133115",
-      "iteration": 1,
-      "before_error": 0.142174,
-      "candidate_error": 0.0813914,
-      "patch_applied": true,
-      "test_passed": true,
+      "experiment_class": "membrane",
       "accepted": true,
-      "reviewer_decision": "accept",
-      "reviewer_summary": "接受。补丁已应用且仅修改 src/shell/ShellStiffness.cpp 中膜内 membraneB 的 gamma_xy 构造，在进入 addBtDB 前将膜内剪切行投影到单元中心导数；未触碰 shearB、bendingB、drilling、积分点数量、材料参数、DOF 排列、测试阈值或参考数据。C++/Catch2 验证通过：6 个 test case、43 个 assertions 全部通过。真实 Frobenius 相对误差从 0.142174 下降到 0.0813914，满足实际下降要求；symmetry_error 仍保持极小量级 2.00727e-20。max_absolute_error 未改善且仍为 112179000.0，说明弯剪/uz 主峰尚未解决，但不否定本轮膜内机制的有效下降。",
       "failure_mechanism": "接受。补丁已应用且仅修改 src/shell/ShellStiffness.cpp 中膜内 membraneB 的 gamma_xy 构造，在进入 addBtDB 前将膜内剪切行投影到单元中心导数；未触碰 shearB、bendingB、drilling、积分点数量、材料参数、DOF 排列、测试阈值或参考数据。C++/Catch2 验证通过：6 个 test case、43 个 assertions 全部通过。真实 Frobenius 相对误差从 0.142174 下降到 0.0813914，满足实际下降要求；symmetry_error 仍保持极小量级 2.00727e-20。max_absolute_error 未改善且仍为 112179000.0，说明弯剪/uz 主峰尚未解决，但不否定本轮膜内机制的有效下降。",
       "do_not_repeat": [
         "不要把本轮已验证的膜内中心剪切 assumed-strain 投影继续扩大到 transverse shear、bending 或 drilling 通道",
         "不要在下一轮用整体缩放材料矩阵、厚度、积分权重来解释本轮剩余误差",
         "不要重复历史已失败的 MITC4 边中点/多点剪切加和或 gamma_yz 单行符号翻转方案"
       ],
-      "next_focus": "下一轮唯一焦点应转向仍未改善的 bending_shear__bending_shear / uz-uz 主峰，严格核对横向剪切 w-rx-ry 局部自由度映射与 Abaqus S4 约定的一致性，不改变本轮已生效的膜内投影。",
-      "experiment_plan": {
-        "hypothesis_id": "stage3-lg-20260724-133115-it01-membrane-assumed-strain",
-        "experiment_class": "membrane",
-        "target_block": "membrane_xy__membrane_xy / ux-uy in-plane translational channel",
-        "mechanism": "验证 Abaqus S4 的膜内刚度不是当前标准 Q4 双线性位移场的纯 2x2 Gauss 膜内 B 矩阵，而是包含 assumed-strain / incompatible-mode 型膜内剪切-正应变重分配；该机制只解释 ux/uy 条目中相邻边与对角耦合成对一增一减的系统性偏差。",
-        "allowed_changes": [
-          "仅允许修改 src/shell/ShellStiffness.cpp 中膜内 membraneB 的构造公式或膜内 B 矩阵进入 addBtDB 前的 assumed-strain 投影/修正",
-          "仅允许作用于 ux、uy 对应的膜内应变分量 epsilon_x、epsilon_y、gamma_xy",
-          "保持膜内仍使用当前 2x2 Gauss 积分点和当前 plane-stress material matrix，不得改变 E、nu、thickness 或剪切修正系数",
-          "允许在 computeLocalComponents 内为 membraneB 增加一个局部、可开关的膜内剪切/正应变重分配项，用于检验 ux/uy 相邻边项和对角项是否向 Abaqus S4 靠拢"
-        ],
-        "forbidden_changes": [
-          "不得修改横向剪切 shearB、剪切积分点数量、MITC4 边中点投影或任何已失败的四边中点/多点剪切加和方案",
-          "不得再次翻转 gamma_yz 中 ry/theta_y 的单行符号，也不得做未成体系的剪切符号修补",
-          "不得修改钻转罚项 addDrillingPenalty、drilling penalty alpha、rz/theta_z 通道或膜-钻转耦合构造",
-          "不得修改 bendingB 弯曲公式、rx/ry 弯曲符号、局部坐标系构造、全局坐标变换或 DOF 排列",
-          "不得改测试阈值、参考 Abaqus S4 数据、误差计算脚本或任何验证门禁",
-          "不得原样重复 stage3-20260724-111132:iteration-01/02/03、stage3-20260724-105751:iteration-01/03、stage3-lg-20260724-113704:iteration-01、stage3-lg-20260724-124433:iteration-01/03 的剪切积分或剪切符号机制"
-        ],
-        "expected_metrics": [
-          "frobenius_relative_error",
-          "membrane_xy__membrane_xy",
-          "bending_shear__bending_shear",
-          "membrane_xy__bending_shear",
-          "bending_shear__membrane_xy",
-          "drilling__drilling",
-          "largest_absolute_entries:n1.ux-n2.ux",
-          "largest_absolute_entries:n2.uy-n4.uy",
-          "largest_absolute_entries:n1.ux-n3.ux",
-          "largest_absolute_entries:n1.uz-n3.uz"
-        ],
-        "difference_from_history": "最接近历史方案集中在 transverse_shear：边中点/MITC4 扩大口径多次把误差从 0.142174 恶化到 0.195-0.255，单行翻转 gamma_yz 的 ry 符号也恶化到 0.25516；这些机制已被 do_not_repeat 明确禁止。本轮不触碰剪切、钻转、DOF 映射或局部坐标，而转向尚未被数值证伪的 membrane 机制。新证据是当前最大绝对误差列表中除 uz-uz 外，ux/uy 膜内项呈稳定的成对重分配：n1.ux-n2.ux 实际比期望更硬约 8.4596e7，而 n1.ux-n3.ux 实际比期望更软约同量级；membrane_xy__membrane_xy 仍有 0.122735857 的独立误差。这种相邻边/对角项反向等幅偏差更像膜内应变投影或 assumed-strain 口径差异，而不是此前已失败的剪切积分点数量或单个转角符号问题。"
-      },
-      "patch_fingerprint": "356593d431d0b27ea2c60dd8bf94ed8a0f161381c2d43cef783bd3c53218520a",
-      "theory_excerpt": "**Planner 约束确认**\n\n- `experiment_class`: `membrane`\n- `target_block`: `membrane_xy__membrane_xy / ux-uy in-plane translational channel`\n- 本轮只能改 `src/shell/ShellStiffness.cpp` 中膜内 `membraneB` 构造，或膜内 `B` 进入 `addBtDB` 前的 assumed-strain 投影/修正。\n- 只能作用于 `ux/uy` 对应的 `epsilon_x / epsilon_y / gamma_xy`。\n- 必须保持当前 `2x2 Gauss` 膜积分、当前 plane-stress 材料矩阵、`E / nu / thickness / shear correction` 不变。\n- 禁止触碰横向剪切、MITC4、弯曲、钻转、局部坐标、DOF 排列、测试阈值和参考数据。\n- 本轮不重复历史失败的剪切积分、剪切符号或钻转方向；Planner 已明确这些机制已被数值证伪或禁止。\n\n**诊断证据**\n\n已知事实：\n\n- 当前总 Frobenius 相对误差为 `0.142174`。\n- 膜内块 `membrane_xy__membrane_xy` 相对误差为 `0.122735857`，已经是独立可见误差源。\n- 最大绝对误差中，除 `uz-uz` 剪切/弯剪相关项外，`ux/uy` 膜内项大量进入前列，误差量级约 `8.4596e7`。\n- 膜内误差呈稳定的“相邻边项与对角项反向重分配”：\n  - `n1.ux-n2.ux`: 当前 `-6.346e8`，Abaqus `-5.500e8`，当前过硬约 `8.46e7`。\n  - `n1.ux-n3.ux`: 当前 `-5.192e8`，Abaqus `-6.038e8`，当前过软约 `8.46e7`。\n  - `uy` 通道也出现同类边/对角反向偏差。\n\n理论推断：\n\n- 这种误差不像材料系数、厚度或整体积分权重错误。若是整体尺度错误，膜内多数条目应同向偏大或偏小，而不是相邻边和对角项成对互换。\n- 也不像 DOF 排列错误。当前矩阵对称性误差极小 `1.95e-20`，且误差集中在同一物理通道内的耦合模式，而不是跨 DOF 大面积错位。\n- 更符合膜内 `Q4` 双线性位移场的应变模式与 Abaqus S4 assumed-strain 膜内处理不同：Abaqus S4 可能对 `epsilon_x / epsilon_y / gamma_xy` 中的寄生剪切或弯曲型膜内模式做了投影，导致边耦合刚度降低、对角耦合刚度提高。\n\n待验证假设：\n\n- 当前 C++ 的膜内刚度使用标准 `Q4` isoparametric `B_m` 直接 `2x2 Gauss` 积分，保留了 Abaqus S4 中被 assumed-strain 处理削弱或重分配的膜内寄生模式。\n- 对膜内 `B` 做一个局部 assumed-strain 投影，优先重分配 `gamma_xy` 与 `epsilon_x/epsilon_y` 的双线性扰动部分，可以降低 `membrane_xy__membrane_xy` 误差，并带动总 Frobenius 误差下降。\n\n**单一修正假设**\n\n本轮唯一建议改动方向：\n\n在 `computeLocalComponents` 的膜内积分循环中，不改变积分点、材料矩阵和 DOF 映射，只在 `membraneB` 进入 `addBtDB` 前加入一个膜内 assumed-strain 投影：将标准 `Q4` 膜内 `B` 分解为常应变/线性主导部分与寄生双线性扰动部分，对 `gamma_xy` 以及与其耦合的 `epsilon_x / epsilon_y` 扰动项做投影重分配。\n\n具体落地口径应保持局部、可开关、只影响膜内三行：\n\n- 保留 `epsilon_x = du/dx`、`epsilon_y = dv/dy` 的基本项。\n- 针对每个 `2x2 Gauss` 点，构造当前标准 `membraneB` 后，对膜内 `B` 做 assumed-strain 修正，而不是修改材料矩阵或积分权重。\n- 修正目标不是整体缩放膜刚度，而是削弱导致相邻边 `ux-ux / uy-uy` 过硬的寄生模式，同时增强对角 `ux-ux / uy-uy` 耦合对应的膜内模式。\n- 实现上建议 Developer Agent 采用“投影矩阵/模式过滤”形式，而不是硬编码单个矩阵条目补偿；否则很容易只拟合当前 case，失去理论可解释性。\n\n这与历史失败机制的实质差异：\n\n- 历史失败集中在 transverse shear：MITC4 边中点、多点剪切加和、`gamma_yz` 单行符号翻转。\n- 本假设完全不触碰 `shearB`、`bendingB`、`rz` 钻转或转角符号。\n- 修正对象是膜内 `ux/uy -> epsilon_x/epsilon_y/gamma_xy` 的 assumed-strain 投影，属于不同物理通道和不同离散误差来源，因此不会原样复现此前剪切误差扩大到 `0\n[已截断 1261 个字符]",
-      "patch_excerpt": "--- a/src/shell/ShellStiffness.cpp\n+++ b/src/shell/ShellStiffness.cpp\n@@ -264,6 +264,7 @@ ShellStiffnessComponents computeLocalComponents(const ShellElementInput& input,\n         std::array<double, 2>{-gauss, gauss},\n     };\n \n+    const ShapeData membraneAssumed = evaluateShape(geometry, 0.0, 0.0);\n     for (const auto& point : integrationPoints) {\n         const ShapeData shape = evaluateShape(geometry, point[0], point[1]);\n         BMatrix3 membraneB{};\n@@ -275,9 +276,13 @@ ShellStiffnessComponents computeLocalComponents(const ShellElementInput& input,\n             membraneB[0][base] = shape.dNdx[node];\n             membraneB[1][base + 1] = shape.dNdy[node];\n             membraneB[2][base] = shape.dNdy[node];\n             membraneB[2][base + 1] = shape.dNdx[node];\n \n             bendingB[0][base + 4] = shape.dNdx[node];\n             bendingB[1][base + 3] = -shape.dNdy[node];\n             bendingB[2][base + 3] = -shape.dNdx[node];\n             bendingB[2][base + 4] = shape.dNdy[node];\n         }\n+        // 膜内 assumed-strain：仅投影 gamma_xy 的寄生双线性扰动，保留 eps_x/eps_y 基本拉伸项。\n+        for (std::size_t node = 0; node < kNodeCount; ++node) {\n+            const std::size_t base = node * kDofPerNode;\n+            membraneB[2][base] = membraneAssumed.dNdy[node];\n+            membraneB[2][base + 1] = membraneAssumed.dNdx[node];\n+        }\n         addBtDB(components.membrane, membraneB, membraneMaterial, shape.detJ);\n         addBtDB(components.bending, bendingB, bendingMaterial, shape.detJ);\n         addDrillingPenalty("
+      "next_focus": "下一轮唯一焦点应转向仍未改善的 bending_shear__bending_shear / uz-uz 主峰，严格核对横向剪切 w-rx-ry 局部自由度映射与 Abaqus S4 约定的一致性，不改变本轮已生效的膜内投影。"
     },
     {
       "id": "stage3-lg-20260724-133115:iteration-02",
-      "run_id": "stage3-lg-20260724-133115",
-      "iteration": 2,
-      "before_error": 0.0813914,
-      "candidate_error": 0.0683817,
-      "patch_applied": true,
-      "test_passed": true,
+      "experiment_class": "transverse_shear",
       "accepted": true,
-      "reviewer_decision": "accept",
-      "reviewer_summary": "接受。本轮补丁只修改 src/shell/ShellStiffness.cpp 中 transverse shear 的 shearMaterial 两个对角项，将 gamma_xz/gamma_yz 的有效刚度统一乘以 2/3，符合计划允许范围；未修改 shearB、积分点、DOF 排列、钻转罚项、参考矩阵或测试阈值。C++/Catch2 验证通过：6 个 test cases、43 个 assertions 全部通过。真实 Frobenius 相对误差从 0.0813914 下降到 0.0683817，max_absolute_error 也从 112179000.0 降到 89743600.0，symmetry_error 仍保持数值零量级 2.05592e-20。该结果支持“当前 transverse shear 本构有效刚度相对 Abaqus S4 过硬”的假设，且没有证据显示绕过测试或扩大不受控范围。",
       "failure_mechanism": "接受。本轮补丁只修改 src/shell/ShellStiffness.cpp 中 transverse shear 的 shearMaterial 两个对角项，将 gamma_xz/gamma_yz 的有效刚度统一乘以 2/3，符合计划允许范围；未修改 shearB、积分点、DOF 排列、钻转罚项、参考矩阵或测试阈值。C++/Catch2 验证通过：6 个 test cases、43 个 assertions 全部通过。真实 Frobenius 相对误差从 0.0813914 下降到 0.0683817，max_absolute_error 也从 112179000.0 降到 89743600.0，symmetry_error 仍保持数值零量级 2.05592e-20。该结果支持“当前 transverse shear 本构有效刚度相对 Abaqus S4 过硬”的假设，且没有证据显示绕过测试或扩大不受控范围。",
       "do_not_repeat": [
         "不要把本轮成功的 2/3 横向剪切本构缩放扩大为整体刚度矩阵、材料矩阵、厚度或积分权重缩放",
         "不要在下一轮同时修改 shearB 符号、积分口径和本构系数，避免混合归因",
         "不要重复历史已失败的 MITC4 边中点/多点剪切加和或单独翻转 gamma_yz 中 ry/theta_y 符号"
       ],
-      "next_focus": "下一轮唯一焦点应是基于更新后的报告分块误差和最大残差条目，重新定位 0.0683817 剩余误差的主导块；只有确认残差仍主要集中在 transverse shear 的同模式比例偏差时，才继续做局部剪切系数细化。",
-      "experiment_plan": {
-        "hypothesis_id": "stage3-lg-20260724-133115-it02-transverse-shear-abq-s4-shear-factor",
-        "experiment_class": "transverse_shear",
-        "target_block": "bending_shear__bending_shear / uz-rx-ry transverse-shear channel",
-        "mechanism": "验证 Abaqus S4 的横向剪切有效刚度是否低于当前实现的中心点 SRI 剪切刚度；当前最大 uz-uz 与 uz-rotation 条目呈稳定 1.5 倍过硬特征，优先只调整横向剪切本构中的剪切修正系数，而不改变剪切 B 矩阵、积分点或 DOF 符号。",
-        "allowed_changes": [
-          "仅允许修改 src/shell/ShellStiffness.cpp 中横向剪切材料矩阵 shearMaterial 的系数构造，例如将当前 kappa * G * thickness 的 transverse shear 刚度系数替换为 Abaqus S4 对齐候选系数",
-          "候选调整必须只作用于 gamma_xz/gamma_yz 两个 transverse shear 本构对角项，且 xz 与 yz 使用同一系数",
-          "允许在测试或诊断输出中临时记录 shear-only 子矩阵的 uz-uz、uz-rx、uz-ry 条目用于验证比例，但不得改变参考数据或阈值",
-          "保持当前已接受的 membrane gamma_xy 中心导数投影实现不变"
-        ],
-        "forbidden_changes": [
-          "不得修改 membraneB、bendingB、drilling penalty、DOF 排列、局部坐标基底、厚度、弹性模量、泊松比或参考矩阵",
-          "不得把本轮已验证的膜内中心剪切 assumed-strain 投影继续扩大到 transverse shear、bending 或 drilling 通道",
-          "不得使用整体缩放总刚度矩阵、材料矩阵、厚度或积分权重来解释剩余误差；本轮只允许横向剪切本构系数的局部修正",
-          "不得重复历史已失败的 MITC4 边中点/多点剪切加和、边中点符号投影或增加剪切积分点数量",
-          "不得再次原样尝试只翻转 gamma_yz 中 ry/theta_y 符号，也不得做未核对完整剪切公式的单行符号修补",
-          "不得把剪切符号修正与积分口径变更混在同一轮"
-        ],
-        "expected_metrics": [
-          "frobenius_relative_error",
-          "bending_shear__bending_shear relative error",
-          "largest_absolute_entries for n1.uz-n3.uz and n2.uz-n4.uz",
-          "uz-rotation coupling entries such as n1.uz-n2.rx, n1.uz-n3.rx, n1.uz-n3.ry, n1.uz-n4.ry",
-          "membrane_xy__membrane_xy relative error should remain near current 0.025073",
-          "drilling__drilling relative error should not be used as acceptance driver in this experiment",
-          "symmetry_error"
-        ],
-        "difference_from_history": "最接近的历史方案是横向剪切方向，但历史失败集中在两类：一是把中心点 SRI 改成边中点/MITC4/多点剪切投影，误差恶化到约 0.195-0.252；二是单独翻转 gamma_yz 中 ry 符号，误差恶化到 0.25516。本轮不改积分口径、不改 shearB 的 uz/rx/ry 符号映射，而是基于当前新诊断中的数值比例证据：主要 uz-uz 和 uz-rotation 最大误差项 actual/expected 近似为 1.5，说明当前 transverse shear 刚度可能整体过硬。当前运行本地闸门尚无被拒绝的新方案，attempted_patch_fingerprints 仅包含上一轮已接受的 membrane 投影补丁；因此该横向剪切本构系数实验与失败历史有实质差异。"
-      },
-      "patch_fingerprint": "6622cdb405c0b737003300aad5a59dde25c23eb02bcd7c0a16eabc9b6669f603",
-      "theory_excerpt": "**Planner 约束确认**\n\n- 本轮必须保持 `experiment_class = transverse_shear`，目标块为 `bending_shear__bending_shear / uz-rx-ry transverse-shear channel`。\n- 允许改动仅限 [src/shell/ShellStiffness.cpp] 中 `shearMaterial` 的横向剪切本构系数构造，即 `gamma_xz/gamma_yz` 两个对角项同系数调整。\n- 禁止改动 `shearB`、`membraneB`、`bendingB`、钻转罚项、DOF 排列、局部坐标、厚度、材料常数、积分点和参考矩阵。\n- 不重复历史失败方案：不做 MITC4 边中点/多点剪切、不做边中点符号投影、不单独翻转 `gamma_yz` 中 `ry/theta_y` 符号。\n\n**诊断证据**\n\n- 已知事实：当前总 Frobenius 相对误差为 `0.0813914`，最大绝对误差仍集中在 `uz` 与 `uz-rx/ry`，属于横向剪切主导通道。\n- 已知事实：`bending_shear__bending_shear` 分块误差为 `0.320735`，明显高于膜内块 `0.025073`，而上一轮膜内修正已被接受且不应再动。\n- 已知事实：关键条目呈稳定比例过硬：\n  - `n1.uz-n3.uz`: actual `-336538461.54`，expected `-224358974.36`，比例约 `1.5`\n  - `n2.uz-n4.uz` 同样约 `1.5`\n  - `n1.uz-n2.rx`: actual `84134615.38`，expected `56089743.59`，比例约 `1.5`\n  - `n1.uz-n3.ry`: actual `-84134615.38`，expected `-56089743.59`，比例约 `1.5`\n- 理论推断：这些条目符号与非零模式整体吻合，主要问题不像 DOF 符号翻转或剪切 B 矩阵拓扑错误；若是符号/映射错误，通常会出现成组符号反转或位置错配，而不是同号同模式的 `1.5` 倍刚度偏差。\n- 理论推断：最大误差项同时覆盖 `uz-uz` 与 `uz-rotation`，且比例一致，说明更像横向剪切材料系数整体偏大，而不是单个旋转自由度符号问题。\n- 待验证假设：Abaqus S4 在该基准下的有效 transverse shear 刚度约为当前实现的 `2/3`。\n\n**单一修正假设**\n\n将当前横向剪切本构系数从：\n\n```cpp\nkappa * G * thickness\n```\n\n局部替换为：\n\n```cpp\n(2.0 / 3.0) * kappa * G * thickness\n```\n\n等价于在保持 `kappa = 5/6` 常量不变的前提下，仅对 `shearMaterial[0][0]` 与 `shearMaterial[1][1]` 使用 Abaqus S4 对齐候选有效系数：\n\n```text\nk_shear_abq ≈ 5/9 * G * thickness\n```\n\n本轮不建议修改 `kShearCorrection` 全局常量本身，避免误伤其他潜在用途；只在 `shearMaterial` 构造处局部表达该 transverse shear 有效系数。\n\n**预期影响**\n\n- `uz-uz` 横向剪切主峰应从当前约 `1.5 × expected` 降至接近 Abaqus S4：\n  - `-336538461.54 * 2/3 ≈ -224358974.36`\n- `uz-rx/ry` 耦合项也应同步降低：\n  - `84134615.38 * 2/3 ≈ 56089743.59`\n- `bending_shear__bending_shear` 相对误差应显著下降，是本轮主要验收指标。\n- `membrane_xy__membrane_xy` 应维持接近 `0.025073`，因为不触碰上一轮膜内中心剪切投影。\n- `symmetry_error` 应维持极小，因为只改对称材料矩阵的两个相同对角系数。\n- `drilling__drilling` 误差不应作为本轮接受/拒绝主依据。\n\n**回归风险**\n\n- 若 Abaqus S4 的该比例并非纯本构系数，而是由剪切插值/积分口径共同导致，则单纯 `2/3` 系数可能只改善最大条目，不能充分降低整个 `bending_shear__bending_shear` 块。\n- 若 `bending_shear__bending_shear` 中仍混有弯曲转角刚度误差，横向剪切缩放会改善 `uz` 相关项，但对纯 `rx/ry-rx/ry` 弯曲项影响有限。\n- 该方案与历史横向剪切失败方向的实质差异是：不改变 `shearB` 离散、边中点公式、积分点数量或符号映射，只调整 `gamma_xz/gamma_yz` 本构对角刚度。因此不会复现 MITC4/多点剪切导致的模式重分布错误，也不会复现单行符号翻转导致的符号错配。\n\n**验证方法**\n\n- Developer\n[已截断 467 个字符]",
-      "patch_excerpt": "--- a/src/shell/ShellStiffness.cpp\n+++ b/src/shell/ShellStiffness.cpp\n@@ -265,9 +265,11 @@ ShellStiffnessComponents computeLocalComponents(const ShellElementInput& input,\n         input.youngModulus * std::pow(input.thickness, 3) / (12.0 * elasticDenominator), input.poissonRatio);\n     const double shearModulus = input.youngModulus / (2.0 * (1.0 + input.poissonRatio));\n     Matrix2 shearMaterial{};\n-    shearMaterial[0][0] = kShearCorrection * shearModulus * input.thickness;\n-    shearMaterial[1][1] = kShearCorrection * shearModulus * input.thickness;\n+    // Abaqus S4 对齐：仅降低横向剪切 gamma_xz/gamma_yz 的有效本构刚度。\n+    const double transverseShearStiffness = (2.0 / 3.0) * kShearCorrection * shearModulus * input.thickness;\n+    shearMaterial[0][0] = transverseShearStiffness;\n+    shearMaterial[1][1] = transverseShearStiffness;\n \n     constexpr double gauss = 0.57735026918962576451;\n     const std::array<std::array<double, 2>, 4> integrationPoints = {"
+      "next_focus": "下一轮唯一焦点应是基于更新后的报告分块误差和最大残差条目，重新定位 0.0683817 剩余误差的主导块；只有确认残差仍主要集中在 transverse shear 的同模式比例偏差时，才继续做局部剪切系数细化。"
     },
     {
       "id": "stage3-lg-20260724-133115:iteration-03",
-      "run_id": "stage3-lg-20260724-133115",
-      "iteration": 3,
-      "before_error": 0.0683817,
-      "candidate_error": 0.0595967,
-      "patch_applied": true,
-      "test_passed": true,
+      "experiment_class": "integration",
       "accepted": true,
-      "reviewer_decision": "accept",
-      "reviewer_summary": "接受。补丁已应用且仅修改 src/shell/ShellStiffness.cpp 中 components.shear 的横向剪切积分循环：由中心点单点 SRI 改为复用现有 integrationPoints 的 2x2 Gauss 累加，shearB 的 w/rx/ry 映射、gamma_yz/ry 符号、shearMaterial 的 2/3 有效刚度、膜/弯曲/钻转分块、DOF 顺序和验证门禁均未改变。C++/Catch2 验证通过：6 个 test cases、43 个 assertions 全部通过。真实 Frobenius 相对误差从 0.0683817 下降到 0.0595967，max_absolute_error 从 89743600.0 降到 74786300.0，对称性误差仍为数值零量级 8.29142e-18。该结果支持横向剪切积分口径确实解释了一部分剩余 uz 通道结构误差。",
       "failure_mechanism": "接受。补丁已应用且仅修改 src/shell/ShellStiffness.cpp 中 components.shear 的横向剪切积分循环：由中心点单点 SRI 改为复用现有 integrationPoints 的 2x2 Gauss 累加，shearB 的 w/rx/ry 映射、gamma_yz/ry 符号、shearMaterial 的 2/3 有效刚度、膜/弯曲/钻转分块、DOF 顺序和验证门禁均未改变。C++/Catch2 验证通过：6 个 test cases、43 个 assertions 全部通过。真实 Frobenius 相对误差从 0.0683817 下降到 0.0595967，max_absolute_error 从 89743600.0 降到 74786300.0，对称性误差仍为数值零量级 8.29142e-18。该结果支持横向剪切积分口径确实解释了一部分剩余 uz 通道结构误差。",
       "do_not_repeat": [
         "不要再次把本轮已接受的 transverse shear 2x2 积分原样作为新实验重复提交",
         "不要在下一轮继续通过 shearMaterial 系数、整体刚度缩放、厚度缩放或积分权重缩放来解释剩余误差",
         "不要回退到中心点 SRI、MITC4 边中点投影、多点 tying 或 gamma_yz/ry 单行符号翻转等已有失败或已被替代的剪切方案"
       ],
-      "next_focus": "下一轮唯一焦点应在保持当前膜内投影、2/3 剪切本构和 transverse shear 2x2 积分不变的前提下，定位剩余 max_absolute_error 74786300.0 对应的具体 bending_shear__bending_shear 条目，判断残差是否来自 uz-rx/ry 转角耦合尺度/局部转角约定，而不是再改积分口径。",
-      "experiment_plan": {
-        "hypothesis_id": "stage3-lg-20260724-133115-it03-integration-shear-2x2-existing-material",
-        "experiment_class": "integration",
-        "target_block": "bending_shear__bending_shear / uz-rx-ry transverse shear channel",
-        "mechanism": "验证 Abaqus S4 的剩余 uz-uz 邻接耦合是否来自横向剪切积分口径，而不是剪切本构比例、转角符号或钻转罚项；当前中心点 SRI 在多个相邻 uz-uz 条目给出 0，而 Abaqus S4 期望约 -4.487179e7，这类零结构不能通过继续缩放 shearMaterial 修复。",
-        "allowed_changes": [
-          "仅允许修改 src/shell/ShellStiffness.cpp 中横向剪切 components.shear 的积分循环",
-          "将当前 center=(0,0) 单点 SRI 的 addBtDB 调用替换为与膜/弯曲相同的 2x2 Gauss 点累加，但 shearB 公式必须保持现有 w/rx/ry 映射不变",
-          "继续使用上一轮已接受的 shearMaterial 对角项 2/3 有效刚度，不允许再调系数",
-          "每个剪切积分点只允许调用 evaluateShape(geometry, xi, eta)，使用 shape.dNdx、shape.dNdy、shape.values 和 shape.detJ 构造同一 shearB",
-          "允许新增最小范围的局部 helper/lambda 以避免重复构造 shearB，但不得改变其他刚度分块"
-        ],
-        "forbidden_changes": [
-          "不得修改 membrane 或 bending 的材料矩阵、B 矩阵、厚度因子、2x2 Gauss 权重或自由度顺序",
-          "不得修改 drilling penalty、rz 通道、kDrillingPenalty 或 drilling B 矩阵",
-          "不得修改 shearMaterial 的 2/3 缩放、不得改成整体刚度矩阵缩放、材料矩阵缩放、厚度缩放或积分权重缩放",
-          "不得翻转 shearB[1][base + 3] 的 gamma_yz/ry 符号；该单行符号修补已多次导致 frobenius_relative_error 恶化到 0.25516",
-          "不得采用 MITC4 边中点投影、边中点/多点剪切加和、tying 点投影或替换 shearB 形函数；这些相近方案已有 0.196 到 0.252 的失败历史",
-          "不得同时修改局部坐标、DOF mapping、参考矩阵、测试阈值或误差计算脚本"
-        ],
-        "expected_metrics": [
-          "frobenius_relative_error",
-          "bending_shear__bending_shear",
-          "membrane_xy__membrane_xy",
-          "drilling__drilling",
-          "bending_shear__membrane_xy",
-          "membrane_xy__bending_shear",
-          "largest_absolute_entries:n*.uz-n*.uz",
-          "largest_absolute_entries:n*.uz-n*.rx",
-          "largest_absolute_entries:n*.uz-n*.ry",
-          "symmetry_error",
-          "max_absolute_error"
-        ],
-        "difference_from_history": "最接近的失败历史是横向剪切边中点/MITC4 投影和 gamma_yz 单行符号翻转。实质差异是：本轮不改变 shearB 符号、不做 MITC/边中点投影、不调 shearMaterial 系数，只验证同一中心剪切公式在 2x2 Gauss 面内积分后能否生成当前缺失的相邻 uz-uz 非零耦合。新证据来自上一轮 2/3 本构缩放已被接受并把误差降到 0.0683817，但剩余最大残差仍集中在 transverse shear 的 uz 通道，且 actual 的相邻 uz-uz 为 0、expected 为 -4.487179e7，说明继续做纯比例缩放无法产生缺失结构，必须单独检验积分口径。"
-      },
-      "patch_fingerprint": "e9239acabb0b178a05d24f6bb1394efa5f032f1aa463f6949663c578df99f54f",
-      "theory_excerpt": "**Planner 约束确认**\n\n- `experiment_class`: `integration`，必须围绕横向剪切积分口径验证。\n- `target_block`: `bending_shear__bending_shear / uz-rx-ry transverse shear channel`。\n- 本轮唯一允许改动：仅在 [src/shell/ShellStiffness.cpp](/workspace/src/shell/ShellStiffness.cpp) 中，把 `components.shear` 的当前中心点 SRI 单点积分改为 2x2 Gauss 点累加。\n- 必须保持不变：现有 `shearB` 的 `w/rx/ry` 映射、`shearMaterial` 的 `2/3` 有效刚度、膜/弯曲/钻转分块、DOF 顺序、符号、厚度因子、测试阈值。\n- 禁止重复：MITC4/边中点投影、多点剪切 tying、`gamma_yz/ry` 单行符号翻转、继续调剪切系数或整体缩放。\n\n**诊断证据**\n\n已知事实：\n\n- 当前 Frobenius 相对误差为 `0.0683817`，已从上一轮 `2/3` 剪切本构缩放中获益。\n- 最大绝对误差集中在 `uz` 通道：\n  - `n*.uz-n*.uz` 对角项当前 `2.243589743e8`，Abaqus S4 期望 `3.141025641e8`，差约 `-8.974359e7`。\n  - 相邻 `uz-uz` 当前为 `0`，Abaqus S4 期望约 `-4.487179e7`。\n  - `uz-rx/ry` 当前绝对值约 `5.608974e7`，Abaqus S4 期望约 `7.852564e7`。\n- `bending_shear__bending_shear` 分块误差仍为 `0.263901`，是当前可控主误差源。\n- `membrane_xy__membrane_xy` 已较低，为 `0.025073`；钻转块虽然相对误差大，但 Planner 明确禁止本轮触碰。\n- 对称性误差 `2.05592e-20`，说明矩阵装配对称性不是主因。\n\n理论推断：\n\n- 中心点 SRI 下，双线性四节点壳的横向剪切 `B_s` 在 `xi=0, eta=0` 取值具有高度对称性，容易使部分相邻 `uz-uz` 刚度项相互抵消或形成零结构。\n- Abaqus S4 参考矩阵中相邻 `uz-uz` 非零负耦合，说明目标矩阵含有面内位置变化带来的剪切梯度积分贡献。\n- 纯比例缩放只能放大已有非零项，不能把当前严格为 `0` 的相邻 `uz-uz` 条目变成 Abaqus 期望的负耦合。因此继续微调 `shearMaterial` 不具备解释力。\n- 上一轮 `2/3` 缩放降低误差后，剩余误差仍呈现同一 transverse shear 通道结构缺失，优先检验积分口径比符号或本构比例更合理。\n\n**单一修正假设**\n\n本轮应选择：将 `components.shear` 的横向剪切积分从中心点单点 SRI 改为标准 `2x2 Gauss` 面内积分，保持现有 `shearB` 公式和 `shearMaterial = 2/3` 有效刚度完全不变。\n\n具体理论假设：\n\n> Abaqus S4 当前参考矩阵中的剩余 `uz-uz` 相邻负耦合，主要来自横向剪切项在四个 Gauss 点上的空间积分；当前中心点 SRI 丢失了双线性形函数导数与节点形函数在面内变化产生的耦合结构，导致相邻 `uz-uz` 项为零。用同一 `shearB` 在 `2x2 Gauss` 点累加后，应生成缺失的非零邻接项，并同步提高 `uz-rx/ry` 耦合幅值。\n\n这与历史失败方案的实质差异：\n\n- 不做 MITC4 投影，不替换剪切应变插值，不使用边中点 tying。\n- 不翻转 `gamma_yz` 中 `ry/theta_y` 符号。\n- 不改变剪切材料比例、厚度、权重或全局缩放。\n- 只改变同一 `shearB` 的积分采样位置和累加口径，因此归因单一，可被测试直接验证。\n\n**预期影响**\n\n预期改善：\n\n- `n*.uz-n*.uz` 相邻项应从当前 `0` 变为非零，方向应接近 Abaqus S4 的负值 `-4.487179e7`。\n- `n*.uz-n*.uz` 对角项应上升，接近 Abaqus S4 的 `3.141025641e8`。\n- `n*.uz-n*.rx` 与 `n*.uz-n*.ry` 的绝对值应从 `5.608974e7` 向 `7.852564e7` 靠近。\n- `bending_shear__bending_shear` 分块误差应显著下降，并带动总 Frobenius 相对误差低于 `0.0683817`。\n\n不应变化或只应数值微扰：\n\n- `membrane_xy__membrane_xy`。\n- `drilling__drilling`。\n- `bending_shear__membrane_xy` 与 `membrane_xy__bending_shear` 的结构性状态。\n- 矩阵对称性应继续保持接近零。\n\n**回归风险*\n[已截断 915 个字符]",
-      "patch_excerpt": "--- a/src/shell/ShellStiffness.cpp\n+++ b/src/shell/ShellStiffness.cpp\n@@ -332,21 +332,23 @@ ShellStiffnessComponents computeLocalComponents(const ShellElementInput& input,\n             components.drilling, shape, kDrillingPenalty * shearModulus * input.thickness * shape.detJ);\n     }\n \n-    // 横向剪切采用中心点选择性减缩积分，避免薄壳出现严重剪切锁定。\n-    const ShapeData center = evaluateShape(geometry, 0.0, 0.0);\n-    BMatrix2 shearB{};\n-    for (std::size_t node = 0; node < kNodeCount; ++node) {\n-        const std::size_t base = node * kDofPerNode;\n-        shearB[0][base + 2] = center.dNdx[node];\n-        shearB[0][base + 4] = center.values[node];\n-        shearB[1][base + 2] = center.dNdy[node];\n-        shearB[1][base + 3] = -center.values[node];\n+    // 横向剪切改用同一 shearB 的 2x2 积分，以保留 uz 相邻耦合结构。\n+    for (const auto& point : integrationPoints) {\n+        const ShapeData shape = evaluateShape(geometry, point[0], point[1]);\n+        BMatrix2 shearB{};\n+        for (std::size_t node = 0; node < kNodeCount; ++node) {\n+            const std::size_t base = node * kDofPerNode;\n+            shearB[0][base + 2] = shape.dNdx[node];\n+            shearB[0][base + 4] = shape.values[node];\n+            shearB[1][base + 2] = shape.dNdy[node];\n+            shearB[1][base + 3] = -shape.values[node];\n+        }\n+        addBtDB(components.shear, shearB, shearMaterial, shape.detJ);\n     }\n-    addBtDB(components.shear, shearB, shearMaterial, 4.0 * center.detJ);\n \n     components.total = addMatrices(addMatrices(components.membrane, components.bending),\n                                    addMatrices(components.shear, components.drilling));\n     return components;\n }\n \n } // namespace"
+      "next_focus": "下一轮唯一焦点应在保持当前膜内投影、2/3 剪切本构和 transverse shear 2x2 积分不变的前提下，定位剩余 max_absolute_error 74786300.0 对应的具体 bending_shear__bending_shear 条目，判断残差是否来自 uz-rx/ry 转角耦合尺度/局部转角约定，而不是再改积分口径。"
+    },
+    {
+      "id": "run-20260810-102940:iteration-01",
+      "experiment_class": "bending",
+      "accepted": false,
+      "failure_mechanism": "候选将 rx/ry 导数与局部 x/y 导数整体交换，虽然轻微降低了目标块和总体误差，但没有改变主导的 uz-uz 及 uz-转角残差，说明这些残差主要由横向剪切贡献或其他未触及的刚度机制控制，而非本轮弯曲曲率映射。该修改对目标弯曲块的影响接近数值扰动，未获得理论假设所要求的可辨识改善。",
+      "do_not_repeat": [
+        "不得再次原样交换 bendingB 中 rx/ry 导数与 dNdx/dNdy 的整体对应关系",
+        "不得以仅有 2e-7 的 Frobenius 微小下降作为接受依据，尤其在 local_gate_details 未通过时",
+        "不得继续修改弯曲曲率公式或厚度三次系数而不先分离并量化弯曲与横向剪切对 uz-uz、uz-转角残差的贡献",
+        "不得触碰已被规划明确禁止的 shearB、剪切积分口径、膜内项、钻转项、DOF 排列或整体刚度缩放"
+      ],
+      "next_focus": "唯一焦点：对主导 uz-uz 与 uz-转角条目进行弯曲/横向剪切子贡献分解，确认剩余误差是否来自横向剪切本构系数；下一轮仅基于该分解验证一个局部 transverse-shear 刚度系数假设。"
+    },
+    {
+      "id": "run-20260810-102940:iteration-02",
+      "experiment_class": "dof_mapping",
+      "accepted": false,
+      "failure_mechanism": "该成对交换将 shearB 的 dNdx/dNdy 与 rx/ry 列重映射，但在当前各向同性对角剪切材料和中心点构造下，产生的 B^T D B 数值结果与候选前完全相同，未改变主导残差。说明该自由度映射变换在当前问题中是刚度不变量，不能解释 Abaqus S4 与实现之间的 uz-uz 和 uz-转角幅值差异。",
+      "do_not_repeat": [
+        "不得再次提交当前 shearB 的 dNdx/dNdy 与 rx/ry 成对交换或其等价重排",
+        "不得以 Catch2 通过替代数值门禁通过；必须要求 Frobenius 和目标分块实际下降",
+        "不得继续在中心点各向同性剪切材料下尝试仅改变剪切行列映射来解释未变化的 uz-uz 主导残差"
+      ],
+      "next_focus": "唯一焦点：在保持膜内、弯曲、钻转和当前剪切积分口径不变的前提下，定位 transverse shear 刚度幅值/积分构造与 Abaqus 参考中 uz-uz 方向性比例不一致的具体来源，并用一个受控的、非映射不变量的剪切构造实验验证其对 bending_shear__bending_shear 和最大 uz 残差的实际影响。"
+    },
+    {
+      "id": "run-20260810-102940:iteration-03",
+      "experiment_class": "transverse_shear",
+      "accepted": false,
+      "failure_mechanism": "统一将 gamma_xz/gamma_yz 的 uz、rx、ry 项乘以 sqrt(3/2) 会使横向剪切刚度整体放大约 1.5 倍；但候选结果显示原先最大误差并非可由单纯剪切幅值不足解释。放大后 uz-uz 对角项实际值 448717948.7 明显超过期望 314102564.1，目标弯剪块和总 Frobenius 误差同步恶化，说明该幅值归一化假设不成立，或当前残差来自剪切与弯曲/旋转子贡献的组合比例而非整体剪切通道统一缩放。",
+      "do_not_repeat": [
+        "不得再次原样对 shearB 的 gamma_xz/gamma_yz 全部允许项统一乘以 sqrt(3/2) 或等价整体幅值因子",
+        "不得以 Catch2 全通过替代 local_gate_details、Frobenius 下降和目标块下降作为接受依据",
+        "不得继续通过整体放大横向剪切 B 矩阵、剪切材料、厚度或积分权重来追逐 uz-uz 条目",
+        "不得把当前结果解释为需要扩大剪切积分点、MITC4 投影或自由度重排；这些方向已被规划禁止或历史证伪"
+      ],
+      "next_focus": "唯一焦点：对 bending_shear__bending_shear 中 uz-uz、uz-rx/ry、rx/ry-rx/ry 条目分别做横向剪切与弯曲子矩阵贡献分解，先确认是哪一类子项和哪一组条目需要校正，再提出单一局部公式假设。"
+    },
+    {
+      "id": "run-20260810-155336:iteration-01",
+      "experiment_class": "transverse_shear",
+      "accepted": false,
+      "failure_mechanism": "候选把横向剪切刚度整体放大了 1.5 倍，错误地将约 2/3 的单个 uz-uz 条目比例解释为整个 bending_shear 分块都应线性回调。该分块包含不同贡献和耦合关系，整体放大使 uz 对角项及 rx/ry 相关项过硬，偏离参考矩阵；局部比例证据不足以支持统一系数回调至 1.0。",
+      "do_not_repeat": [
+        "不得再次将 gamma_xz/gamma_yz 统一系数从 2/3 直接回调至 1.0 或原样放大横向剪切刚度",
+        "不得以 Catch2 测试通过替代 Frobenius、目标分块和最大绝对误差门禁通过",
+        "不得继续假设单个 uz-uz 条目的 2/3 比例可以直接代表整个 bending_shear__bending_shear 分块的统一线性缩放关系"
+      ],
+      "next_focus": "唯一焦点：在保持 shearB 公式、积分口径、弯曲和其他通道不变的前提下，基于候选前后完整 uz-uz 与 uz-rx/ry 条目分解横向剪切与弯曲贡献，确定一个经数值扫描验证的中间统一剪切系数，并以 bending_shear__bending_shear 和总 Frobenius 误差实际下降为准。"
+    },
+    {
+      "id": "run-20260810-155336:iteration-02",
+      "experiment_class": "dof_mapping",
+      "accepted": false,
+      "failure_mechanism": "补丁只是将已有的 base + 2、base + 3、base + 4 索引改写为命名变量，并保持原有的 w、ry、rx 槽位赋值关系不变，因此没有产生任何数值或通道映射变化。规划假设要求审计后发现并修正真实的节点或转角槽位错配，但候选既未提供索引审计证据，也未修正实际映射，导致目标假设未被验证且矩阵结果不变。",
+      "do_not_repeat": [
+        "不得再次仅将已有自由度索引替换为 w、rx、ry 命名变量而不改变实际映射或提供审计诊断",
+        "不得以 Catch2 全部通过替代 local_gate_details、Frobenius 误差和 bending_shear__bending_shear 实际下降",
+        "不得在没有逐项 shear-only 索引审计结果的情况下强行交换 rx/ry、节点顺序或其他自由度槽位"
+      ],
+      "next_focus": "唯一焦点：先输出并核对 shear-only 中每个 w、rx、ry 局部列对应的物理节点、全局槽位及 uz-uz/uz-rx/uz-ry 条目，确认真实错配后仅修正已被诊断证明错误的映射。"
+    },
+    {
+      "id": "run-20260810-155336:iteration-03",
+      "experiment_class": "dof_mapping",
+      "accepted": false,
+      "failure_mechanism": "补丁无法 dry-run，候选验证流程未执行；同时提供的诊断仅是静态日志声明，未形成可核对的运行审计证据，也未改变实际刚度矩阵。因而无法确认 shearB 列绑定存在错配或证明任何目标分块改善。",
+      "do_not_repeat": [
+        "不得提交无法 dry-run 或无法应用的补丁",
+        "不得把静态 std::cerr 映射声明当作逐项运行审计证据，必须输出并核对实际 shear-only 条目来源",
+        "不得在没有成功候选矩阵、local_gate_details、Catch2 结果及误差前后对比时声称映射修正有效",
+        "不得重复仅增加日志或重命名而不产生可验证数值变化的方案"
+      ],
+      "next_focus": "唯一焦点：修复补丁应用问题并完成可运行的 shear-only 实际列映射审计；只有审计确认真实槽位错配后，才实施单一对应映射修正并重新报告完整门禁与误差对比。"
+    },
+    {
+      "id": "run-20260810-155336:iteration-04",
+      "experiment_class": "dof_mapping",
+      "accepted": false,
+      "failure_mechanism": "补丁无法 dry-run，导致候选验证流程在生成矩阵前终止；同时新增代码只是打印 base+2、base+3、base+4 及当前 shearB 值，没有将审计结果与目标槽位约定进行判定，也没有在确认错配后实施映射修正。因而既未验证 DOF 错配假设，也未产生任何数值变化。",
+      "do_not_repeat": [
+        "不得提交无法 dry-run、无法应用或无法生成候选矩阵的补丁",
+        "不得仅增加 std::cerr 映射声明或打印当前索引而将其视为运行时审计",
+        "不得在没有可核对审计结论和候选前后矩阵指标的情况下修改或声称修正 shearB 映射",
+        "不得以 Catch2 结果缺失或测试通过替代 local_gate_details、候选矩阵和 Frobenius 误差实际下降"
+      ],
+      "next_focus": "唯一焦点：修复补丁的可应用性并完成真正参与 B^T D B 的中心点 shearB 列来源审计，输出可核对的实际槽位与目标映射结论；只有审计明确证明错配后，才实施单一映射修正并重新生成候选矩阵及完整门禁指标。"
+    },
+    {
+      "id": "run-20260810-155336:iteration-05",
+      "experiment_class": "dof_mapping",
+      "accepted": false,
+      "failure_mechanism": "补丁未能应用，导致运行时 shearB 审计、候选刚度矩阵生成和测试验证均未执行。新增代码即使包含实际列扫描，也没有可核对的运行输出或数值结果来证明 DOF 映射错配，更没有证明总体误差和目标分块误差下降。",
+      "do_not_repeat": [
+        "不得提交无法 dry-run 或无法应用的补丁",
+        "不得在没有候选矩阵、local_gate_details、Catch2 结果及候选前后误差对比时声称映射审计或修正有效",
+        "不得以新增审计代码或审计日志存在替代 bending_shear__bending_shear 与 Frobenius 相对误差的实际下降"
+      ],
+      "next_focus": "唯一焦点：先修复补丁上下文或应用方式，使补丁能够成功 dry-run 并生成候选矩阵；随后仅报告实际运行时逐项 shearB 槽位审计及完整门禁和误差对比，审计确认错配前不得修改映射。"
+    },
+    {
+      "id": "run-20260810-155336:iteration-06",
+      "experiment_class": "dof_mapping",
+      "accepted": false,
+      "failure_mechanism": "补丁上下文或应用方式仍不匹配，导致候选在 dry-run 阶段终止。由于候选未构建，审计输出和 C++/Catch2 验证均不可用；即使补丁中的日志代码已定位，也不足以替代可核对的候选矩阵和门禁证据。",
+      "do_not_repeat": [
+        "不得提交 dry-run 失败、patch_applied=false 或无法生成候选矩阵的补丁",
+        "不得仅通过 std::cerr 打印固定 base+2/base+3/base+4 及当前 shearB 值声称完成运行时映射审计",
+        "不得在缺少 local_gate_details、Catch2、候选分块误差和 Frobenius 前后对比时声称假设得到验证",
+        "不得修改 shearB 映射、符号、幅值、积分或其他刚度公式来掩盖候选验证链路失败"
+      ],
+      "next_focus": "唯一焦点：基于当前源码精确修复补丁锚点和应用流程，确保补丁成功 dry-run、实际应用并生成完整候选验证链路；保持刚度公式和 DOF 映射完全不变。"
+    },
+    {
+      "id": "run-20260810-155336:iteration-07",
+      "experiment_class": "transverse_shear",
+      "accepted": false,
+      "failure_mechanism": "所选非均匀 Gauss 权重模式未对应 Abaqus S4 所需的节点间贡献分布，且实际权重排列未证明与 xi*eta 分组及固定积分点顺序一致。它增大了部分转角对角项并使 bending_shear 分块整体恶化，但没有修正主导的远端 uz-uz 误差。该候选因此既未验证权重模式假设，也未产生总体误差下降。",
+      "do_not_repeat": [
+        "不得再次提交 Frobenius 或 bending_shear__bending_shear 误差上升的权重模式。",
+        "不得仅依据 Catch2 通过、对称性保持或非目标分块不变接受候选，必须提供目标分块和总体误差的实际下降。",
+        "不得使用未经运行时积分点坐标与权重索引对应关系核验的固定 1.5/0.5 权重排列。",
+        "不得重复提交已被 Duplicate Gate 命中 semantic-empty-patch 的补丁语义或绕过该门禁。"
+      ],
+      "next_focus": "唯一焦点：核验现有 integrationPoints 的实际顺序与 xi*eta 象限对应关系，并基于 shear-only uz-uz/uz-rx/ry 分项贡献推导一个单一、可证据化的 2x2 Gauss 权重模式；仅在该模式使远端项向目标靠近且同时降低 bending_shear__bending_shear 与 Frobenius 误差后再考虑接受。"
+    },
+    {
+      "id": "run-20260810-155336:iteration-08",
+      "experiment_class": "integration",
+      "accepted": false,
+      "failure_mechanism": "候选在编译阶段失败，原因是诊断开关接入了 ShellElementInput 中不存在的 enableDiagnostics 成员，导致完整验证链路中断。由于未生成候选矩阵和分块诊断，本轮既没有验证 integrationPoints 实际顺序，也没有证明按 xi*eta 绑定 1.5/0.5 权重改善 transverse shear uz-uz 分布；当前补丁还实质性提交了固定 xi*eta 权重模式，但缺少运行时审计证据支撑，接近上一轮被禁止的未经核验权重排列风险。",
+      "do_not_repeat": [
+        "不得引用 ShellElementInput 中不存在的 enableDiagnostics 或其他未声明诊断字段",
+        "不得提交无法编译、test_passed=false 或 local_gate_details.passed=false 的候选",
+        "不得在没有候选矩阵、Frobenius 前后对比和 bending_shear__bending_shear 前后对比时声称权重绑定假设成立",
+        "不得直接提交固定 1.5/0.5 权重模式而未先产出运行时 xi/eta、xi*eta、权重索引和代表性条目分项贡献审计"
+      ],
+      "next_focus": "唯一焦点：先以现有可编译输入接口实现受控的 transverse shear 运行时审计开关或无侵入诊断路径，确保 verify 完整通过并生成候选矩阵、积分点顺序审计、目标分块误差和 Frobenius 前后对比；本轮不要再调整权重数值或剪切公式。"
+    },
+    {
+      "id": "run-20260810-155336:iteration-09",
+      "experiment_class": "integration",
+      "accepted": false,
+      "failure_mechanism": "本轮补丁是数值路径空变更：仅打印 shear_audit，不改变 transverse shear 的积分权重、点贡献组合或累加结果。审计输出确认四个 Gauss 点仍 weight=1，候选矩阵与迭代前完全一致，因此无法验证或实现“剪切积分权重/累加方式导致 bending_shear 误差”的假设。测试通过只说明未破坏现有行为，不构成刚度数值对齐进展。",
+      "do_not_repeat": [
+        "不得再次提交只增加日志或审计输出、但不改变候选矩阵数值路径的补丁。",
+        "不得在 Frobenius 相对误差和目标 bending_shear__bending_shear 分块误差均为 0 改善时申请接受。",
+        "不得把测试通过或对称性保持作为接受依据，必须同时提供总体误差和目标分块误差实际下降。",
+        "不得继续让审计日志无条件写入 stderr/std::clog 后作为候选实现保留，后续应限定为受控诊断或移除。"
+      ],
+      "next_focus": "唯一焦点：基于本轮已打印的实际 xi/eta 顺序和各积分点贡献，推导并实现一个 shear-only 的 2x2 Gauss 权重重分配方案，使远端 uz-uz 更负、邻边 uz-uz 绝对值减小、uz-rx/ry 远端耦合幅值增大，并用候选矩阵证明 bending_shear__bending_shear 与 Frobenius 误差同时下降。"
+    },
+    {
+      "id": "run-20260810-155336:iteration-10",
+      "experiment_class": "transverse_shear",
+      "accepted": false,
+      "failure_mechanism": "固定按 pointIndex 绑定的 1.2/0.8/1.2/0.8 剪切积分权重虽然改变了数值路径并保持总权重为 4，但权重分配没有命中能改善 Abaqus S4 拓扑误差的积分点贡献方向。主导的远端 uz-uz 最大误差完全未下降，反而引入或放大了转角自刚度 rx/rx、ry/ry 误差，使 bending_shear__bending_shear 和总体 Frobenius 误差同时上升。该结果说明当前固定索引权重表与实际 xi/eta 单点贡献方向不匹配，或四点权重重分配假设在该权重模式下被数值证伪。",
+      "do_not_repeat": [
+        "不得再次提交未使 frobenius_relative_error 和 bending_shear__bending_shear 同时下降的剪切权重模式",
+        "不得继续使用未经单点贡献方向验证的固定 pointIndex 权重表 1.2/0.8/1.2/0.8",
+        "不得仅凭 Catch2 测试通过、总权重守恒或对称性仍很小申请接受",
+        "不得忽略关键条目方向检查，尤其是远端 uz-uz、邻边 uz-uz 与远端 uz-rx/ry 的前后实际变化"
+      ],
+      "next_focus": "下一轮唯一焦点：先做 transverse shear 四个 Gauss 点对关键条目 n1.uz-n3.uz、n1.uz-n2.uz、n1.uz-rx/ry 的单点贡献审计，用实际贡献符号和幅值反推权重方向；在没有该审计证据前不要再尝试新的固定权重表。"
+    },
+    {
+      "id": "run-20260810-155336:iteration-11",
+      "experiment_class": "transverse_shear",
+      "accepted": false,
+      "failure_mechanism": "失败机理是受限剪切权重重分配方向错误且证据链不完整：补丁声称单点贡献审计支持重分配，但提交事实没有给出必须的单点贡献表；固定权重没有让远端 uz-uz 主导误差下降，反而把剪切子块误差从 0.224659 提高到 0.259720，并把总体 Frobenius 误差提高约 13.15%。这说明四点 shear 权重扰动没有形成规划假设要求的可分离改善方向，或者所选方向加剧了邻边 uz-uz 与转角刚度残差。测试通过只证明编译和既有断言通过，不能替代数值对齐指标。",
+      "do_not_repeat": [
+        "不得再次提交没有随附四个 Gauss 点关键条目单点贡献表的固定剪切权重补丁。",
+        "不得在 Frobenius 相对误差和 bending_shear__bending_shear 分块误差同时恶化时申请接受。",
+        "不得继续尝试 {1.25, 0.75, 0.75, 1.25} 或仅做简单排列、镜像的固定 pointIndex 权重方案。",
+        "不得用 Catch2 通过、总权重为 4、对称性保持近零来替代主导条目和分块误差实际改善证据。"
+      ],
+      "next_focus": "下一轮唯一焦点：先输出并分析四个 transverse shear Gauss 点对指定关键条目的单点贡献矩阵，若线性约束下不存在同时降低远端 uz-uz、邻边 uz-uz 和 uz-rx/ry 残差的正权重方向，则停止权重调参并转向报告“受限四点权重重分配不可分离”。"
+    },
+    {
+      "id": "run-20260810-155336:iteration-12",
+      "experiment_class": "drilling",
+      "accepted": false,
+      "failure_mechanism": "本轮仅把 drilling penalty 常数从 0.0085 调到 0.0003，确实修正了 rz-rz 自块量级，但 drilling 子块对整体 Frobenius 范数贡献有限；主导误差仍集中在 bending_shear__bending_shear 内的 uz-uz 和 uz-rx/ry 条目，最大绝对误差未下降。因此该局部标定虽然验证了 drilling 罚项尺度问题存在，却不足以形成通过闸门的总体数值对齐改进。",
+      "do_not_repeat": [
+        "不得再次仅靠调小 kDrillingPenalty 常数并以 drilling__drilling 大幅下降申请接受，除非 local_gate_details.passed=true",
+        "不得把 Catch2 测试通过和目标 drilling 子块改善等同于整体候选可接受",
+        "不得继续在最大 uz-uz 误差完全不变、Frobenius 下降低于本地闸门阈值时提交同类 drilling-only 标定"
+      ],
+      "next_focus": "下一轮唯一焦点：回到当前最大绝对误差所在的 bending_shear__bending_shear 子块，针对远端/邻边 uz-uz 以及 uz-rx/ry 条目的单点贡献做定量审计，先定位剪切/弯曲分布误差来源，再提出一个能改变这些主导条目的受控补丁。"
+    },
+    {
+      "id": "run-20260810-155336:iteration-13",
+      "experiment_class": "transverse_shear",
+      "accepted": false,
+      "failure_mechanism": "失败机理是横向剪切四点权重重分配方向错误且证据链不合规：候选按 xi*eta<0 加权 1.5、xi*eta>0 加权 0.5 后，没有增强最大远端 uz-uz 条目，反而放大了 bending_shear__bending_shear 分块总体残差，并新增或放大转角自刚度误差，例如 n2.rx-n2.rx、n2.ry-n2.ry、n4.rx-n4.rx、n4.ry-n4.ry 误差进入最大条目列表。说明该 1.5/0.5 象限绑定并未形成规划要求的“远端增强、邻边削弱、整体下降”的可接受方向，且复现了历史中未经单点贡献核验的固定权重调参失败模式。",
+      "do_not_repeat": [
+        "不得再次提交没有随附四个 Gauss 点 xi、eta、xi*eta 与关键条目 shear-only 单点贡献表的固定剪切权重补丁。",
+        "不得再次使用 xi*eta<0 取 1.5、xi*eta>0 取 0.5 或其简单镜像、排列作为候选实现。",
+        "不得在 Frobenius 相对误差和 bending_shear__bending_shear 分块误差同时恶化时申请接受。",
+        "不得用 Catch2 通过、总权重守恒、对称性满足阈值或代码注释中的审计结论替代真实数值改善证据。"
+      ],
+      "next_focus": "下一轮唯一焦点：先输出未加权状态下四个 transverse shear Gauss 点对 n1.uz-n3.uz、n2.uz-n4.uz、n1.uz-n2.uz、n1.uz-n4.uz 和代表性 uz-rx/ry 条目的 shear-only 单点贡献表，并基于该表判断是否存在同时降低远端、邻边和耦合残差的正权重守恒方向；若不存在，应停止四点权重调参。"
+    },
+    {
+      "id": "run-20260810-155336:iteration-14",
+      "experiment_class": "integration",
+      "accepted": false,
+      "failure_mechanism": "四点剪切权重重分配的方向错误：它在不改变积分点与 B 矩阵的前提下，放大了 bending_shear 子块误差而不是收敛到 Abaqus 参考分布。现有证据表明，基于当前单点贡献表得到的固定正权重组合并未形成可用解，至少这组权重把主导的 `uz-uz` 与 `uz-rx/ry` 条目进一步推离参考值。",
+      "do_not_repeat": [
+        "不要在没有证明 `bending_shear__bending_shear` 和 Frobenius 同时下降的情况下再次提交固定 2x2 剪切权重",
+        "不要继续沿用这组 `0.45, 1.15, 0.45, 1.95` 或其简单排列、镜像、缩放变体",
+        "不要只依赖局部审计文本判断权重合理，必须用完整矩阵和真实误差变化做判定",
+        "不要在未形成可行正权重解前继续扩大 transverse shear 权重搜索范围"
+      ],
+      "next_focus": "下一轮唯一焦点：重新审计四个 Gauss 点的 shear-only 线性响应，先验证是否存在同时降低 `bending_shear__bending_shear` 和 Frobenius 的正权重守恒解；若不存在，停止该权重重分配方向。"
+    },
+    {
+      "id": "run-20260810-155336:iteration-15",
+      "experiment_class": "integration",
+      "accepted": false,
+      "failure_mechanism": "失败机理是 transverse shear 权重绑定方向错误且缺乏规划要求的可行性证明：候选修改了积分点权重但没有给出四个 shear-only 单点贡献矩阵上的约束最小二乘结果，也没有在应用前证明预测可同时降低目标块和总 Frobenius 误差；实际结果反而双双恶化，说明这条权重重分布路径不成立。",
+      "do_not_repeat": [
+        "不要再用未经完整矩阵约束求解证明的手工函数直接生成四点 shear 权重。",
+        "不要再把权重变化伪装成对 `detJ` 的微调，而不报告四个 shear-only 单点贡献、约束条件和预测误差。",
+        "不要在 `bending_shear__bending_shear` 和 Frobenius 同时恶化时继续提交相邻的权重变体。",
+        "不要扩大到 `shearB`、材料矩阵、DOF 映射或积分点集合之外的改动。"
+      ],
+      "next_focus": "下一轮唯一焦点：先给出四个 transverse shear Gauss 点的完整单点贡献矩阵与满足 `w_i>=0、sum(w_i)=4` 的约束最小二乘解，并在应用前证明该解能同时降低目标块和 Frobenius 误差；若不存在这样的解，停止该权重调参方向。"
+    },
+    {
+      "id": "run-20260810-155336:iteration-16",
+      "experiment_class": "drilling",
+      "accepted": false,
+      "failure_mechanism": "drilling penalty 的单一标量缩小确实修正了 drilling__drilling 的孤立尺度失配，但该块对整体 Frobenius 范数贡献不足；主导全局误差的 uz-uz 与 uz-rx/ry 条目未改变，因此总误差几乎不动。本轮补丁更像局部块校准，而不是能通过数值对齐闸门的有效收敛步骤。",
+      "do_not_repeat": [
+        "不要再次提交仅把 kDrillingPenalty 做十倍缩放的常量改动，除非能证明 local_gate_details.passed=true",
+        "不要把 drilling__drilling 的块误差显著下降等同于整体数值对齐成功",
+        "不要在最大绝对误差和主导 uz 相关条目完全不变时接受候选",
+        "不要继续用任意标量试探替代基于矩阵贡献和全局 Frobenius 影响的校准"
+      ],
+      "next_focus": "下一轮唯一焦点：回到最大绝对误差对应的 uz-uz 与 uz-rx/ry bending_shear 子块，定位 transverse shear/bending_shear 贡献的具体幅值或符号来源，但必须先用单点贡献诊断证明候选会同时降低 bending_shear__bending_shear 和 Frobenius。"
+    },
+    {
+      "id": "run-20260810-155336:iteration-17",
+      "experiment_class": "transverse_shear",
+      "accepted": false,
+      "failure_mechanism": "候选验证不可用，根本原因是补丁无法应用，导致实现未进入可测试状态。当前仅有理论上的 MITC4 tying 代码差异，没有实际矩阵结果；在缺少数值证据时不能接受候选。",
+      "do_not_repeat": [
+        "不要提交无法通过 dry-run、无法应用或没有 candidate_error 与 candidate_diagnostics 的补丁。",
+        "不要把理论上符合 MITC4 形式、代码可读性、对称性或 Catch2 结果作为数值接受依据。",
+        "不要在缺少原始与投影 shearB 对六个指定矩阵条目贡献对比的情况下重复提交公式修改。",
+        "不要扩大到权重、drilling、材料参数、厚度、DOF 排列、参考矩阵或误差阈值的修改。"
+      ],
+      "next_focus": "唯一焦点：先修复并验证补丁可应用，在完全相同输入下生成原始与 MITC4 投影 shearB 的六个指定条目贡献及完整矩阵指标；只有确认 Frobenius 相对误差和 bending_shear__bending_shear 同时严格下降且最大 uz 主导误差实质下降后，才提交候选。"
+    },
+    {
+      "id": "run-20260810-155336:iteration-18",
+      "experiment_class": "transverse_shear",
+      "accepted": false,
+      "failure_mechanism": "失败机理是把计划中的单点贡献审计停留在观测阶段，没有把审计结论转化为可验证的权重重绑定；结果矩阵数值完全未变，主导误差块 `bending_shear__bending_shear` 仍停在 0.224659，Frobenius 相对误差也没有下降。也就是说，这一轮没有形成有效的机理修正，只产生了日志噪声。",
+      "do_not_repeat": [
+        "不要再提交只增加诊断打印、但不改变任何刚度装配数值的补丁",
+        "不要在没有先证明四点贡献可以同时改善远端、邻边和 `uz-rx/ry` 条目时，就声称完成了权重重绑定",
+        "不要接受 `test_passed=true` 但 `local_gate_details.passed=false` 且所有关键误差指标不变的候选",
+        "不要重复任何未经单点贡献表支撑的固定权重模式或象限式重分配"
+      ],
+      "next_focus": "下一轮唯一焦点：基于这次审计得到的四点单点贡献，先构造一个真正会改变 `bending_shear` 数值的正权重重绑定候选，并在提交前证明它能同时降低 `bending_shear__bending_shear` 和 Frobenius 相对误差。"
+    },
+    {
+      "id": "run-20260810-155336:iteration-19",
+      "experiment_class": "local_coordinates",
+      "accepted": false,
+      "failure_mechanism": "局部/全局投影矩阵转置没有改变当前算例的数值结果，说明该方向修正未影响实际刚度装配，或当前几何下该变换与原变换等价。因目标弯曲剪切块和主导 uz/转角条目完全不变，局部坐标方向假设未得到数值验证。",
+      "do_not_repeat": [
+        "不要再次提交仅通过 Catch2、保持对称性或增加注释但 Frobenius 误差与 bending_shear__bending_shear 不变的局部坐标变换。",
+        "不要在没有证明投影矩阵实际进入全局刚度变换且改变代表性 uz-uz、uz-rx/ry 条目的情况下重复转置或等价索引改写。",
+        "不要修改参考矩阵、测试阈值、剪切积分权重、shearB、drilling penalty、材料参数或其他计划外范围来掩盖本轮无效结果。"
+      ],
+      "next_focus": "唯一焦点：核实并修正局部刚度到全局刚度的实际变换方向与矩阵乘法索引，加入前后可复现的局部/全局投影及代表性 uz-uz、uz-rx/ry 贡献诊断，确保变换确实改变目标块后再验证 Frobenius 相对误差是否严格下降。"
+    },
+    {
+      "id": "run-20260810-155336:iteration-20",
+      "experiment_class": "local_coordinates",
+      "accepted": false,
+      "failure_mechanism": "失败机理是本轮仍属于等价或无可观测影响的局部坐标变换修改。代码改变了 transform 矩阵方向与乘法索引，并将 total 改为已变换分量相加，但由于线性关系或当前几何/装配路径下等价抵消，最终 24x24 刚度矩阵没有任何数值变化。规划智能体指定的核心假设是“变换结果必须实际进入最终装配并改变代表性 uz-uz、uz-rx/ry 条目”，实际结果没有发生，因此假设未被验证，误差也未下降。",
+      "do_not_repeat": [
+        "不要再提交只调整局部/全局投影矩阵方向、乘法索引或 total 重组方式但最终矩阵逐项不变的补丁",
+        "不要用 Catch2 通过或对称性保持替代 Frobenius 相对误差和 bending_shear__bending_shear 的实际下降",
+        "不要在没有代表性 n1.uz-n3.uz、n1.uz-n2.uz、n1.uz-n3.rx、n1.uz-n3.ry 条目前后非零变化证据时继续局部坐标变换方向假设",
+        "不要重复把 global.total 从 transformToGlobal(local.total) 改为各 transformed component 相加这类线性等价重组作为候选修正"
+      ],
+      "next_focus": "下一轮唯一焦点：先做最小诊断证明当前 sample_001 的 local.total、transformToGlobal(local.total)、以及最终返回 total 是否逐项完全相同，并明确 geometry.basis 是否与全局轴等价；若局部坐标路径在该样本无可观测影响，则停止 local_coordinates 方向，改由规划器重新选择真正能改变 bending_shear__bending_shear 数值的机制。"
     }
-  ]
+  ],
+  "experiments": []
 }

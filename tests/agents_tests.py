@@ -192,6 +192,29 @@ END_UNIFIED_DIFF"""
         self.assertFalse(rejected["passed"])
         self.assertIn("drilling__drilling", rejected["non_target_block_regressions"])
 
+        validation_baseline = {
+            **baseline,
+            "validation": {
+                "ready": True,
+                "worst_frobenius_relative_error": 0.12,
+            },
+        }
+        validation_regression = {
+            **candidate,
+            "validation": {
+                "ready": True,
+                "worst_frobenius_relative_error": 0.121,
+            },
+        }
+        validation_rejected = evaluate_candidate_gate(
+            validation_baseline,
+            validation_regression,
+            "bending_shear__bending_shear",
+            True,
+        )
+        self.assertFalse(validation_rejected["passed"])
+        self.assertFalse(validation_rejected["validation"]["passed"])
+
     def test_semantic_patch_fingerprint_ignores_comments_and_hunk_lines(self) -> None:
         first = """--- a/src/shell/ShellStiffness.cpp
 +++ b/src/shell/ShellStiffness.cpp

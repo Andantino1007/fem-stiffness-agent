@@ -1,0 +1,13 @@
+{
+  "schema_version": 2,
+  "project_id": "my-element-stiffness",
+  "train": [
+    "data/my_element/meta/train_001.json"
+  ],
+  "validation": [
+    "data/my_element/meta/validation_001.json"
+  ],
+  "test": [
+    "data/my_element/meta/test_001.json"
+  ]
+}

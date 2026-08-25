@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import csv
 import hashlib
 import json
 import math
@@ -17,39 +16,47 @@ from pathlib import Path
 from typing import Any
 
 from agent_openai_client import call_openai_agent, load_openai_config
+from shell_agent.matrix_validation import (
+    matrix_diagnostics as build_matrix_diagnostics,
+    read_square_matrix,
+    relative_block_error,
+)
+from shell_agent.dataset_verification import load_dataset
+from shell_agent.project_config import DEFAULT_PROJECT_PATH, load_project_config
+from shell_agent.verification import sample_matrix_paths
 
 
 ROOT = Path(__file__).resolve().parents[1]
+PROJECT = load_project_config(DEFAULT_PROJECT_PATH)
 PROMPTS_DIR = ROOT / "agents" / "prompts"
 RUNS_DIR = ROOT / "workflow" / "runs"
-SOURCE_PATH = ROOT / "src" / "shell" / "ShellStiffness.cpp"
+SOURCE_PATHS = [ROOT / path for path in PROJECT.allowed_patch_paths]
+SOURCE_PATH = SOURCE_PATHS[0]
 REPORT_PATH = ROOT / "docs" / "verification" / "sample-001-report.md"
-ABAQUS_MATRIX_PATH = ROOT / "data" / "abaqus" / "matrix" / "sample_001_abaqus_s4.csv"
-CPP_MATRIX_PATH = ROOT / "data" / "cpp" / "sample_001_cpp.csv"
+ABAQUS_MATRIX_PATH, CPP_MATRIX_PATH, _PRIMARY_SAMPLE = sample_matrix_paths(
+    ROOT / PROJECT.primary_sample_path
+)
 PROGRESS_OVERVIEW_PATH = ROOT / "docs" / "PROJECT_PROGRESS.md"
 PROGRESS_LOG_PATH = ROOT / "docs" / "verification" / "progress-log.md"
 LATEST_REPORT_PATH = ROOT / "docs" / "verification" / "agent-latest.md"
 EXPERIMENT_MEMORY_PATH = ROOT / "workflow" / "experiment-memory.json"
 
-ALLOWED_PATCH_PATHS = {"src/shell/ShellStiffness.cpp"}
+ALLOWED_PATCH_PATHS = set(PROJECT.allowed_patch_paths)
 GLOBAL_METRIC_KEYS = {
     "frobenius_relative_error",
     "max_absolute_error",
     "max_relative_entry_error",
     "symmetry_error",
 }
-BLOCK_NAMES = {"membrane_xy", "bending_shear", "drilling"}
-BLOCK_METRIC_KEYS = {
-    f"{row_name}__{col_name}"
-    for row_name in BLOCK_NAMES
-    for col_name in BLOCK_NAMES
-}
+BLOCK_NAMES = set(PROJECT.block_names)
+BLOCK_METRIC_KEYS = PROJECT.block_metric_keys
 ALLOWED_EXPECTED_METRICS = GLOBAL_METRIC_KEYS | BLOCK_METRIC_KEYS
-MIN_FROBENIUS_ABSOLUTE_DROP = 1.0e-6
-MIN_FROBENIUS_RELATIVE_DROP = 1.0e-4
-MAX_SYMMETRY_ERROR = 1.0e-12
-MAX_ABSOLUTE_ERROR_REGRESSION = 0.01
-MAX_NON_TARGET_BLOCK_REGRESSION = 0.05
+MIN_FROBENIUS_ABSOLUTE_DROP = PROJECT.acceptance["min_frobenius_absolute_drop"]
+MIN_FROBENIUS_RELATIVE_DROP = PROJECT.acceptance["min_frobenius_relative_drop"]
+MAX_SYMMETRY_ERROR = PROJECT.acceptance["max_symmetry_error"]
+MAX_ABSOLUTE_ERROR_REGRESSION = PROJECT.acceptance["max_absolute_error_regression"]
+MAX_NON_TARGET_BLOCK_REGRESSION = PROJECT.acceptance["max_non_target_block_regression"]
+MAX_VALIDATION_ERROR_REGRESSION = PROJECT.acceptance["max_validation_error_regression"]
 BANNED_ADDED_TOKENS = {
     "system(",
     "popen(",
@@ -205,7 +212,7 @@ def build_experiment_record(
 
 
 def load_experiment_memory(path: Path = EXPERIMENT_MEMORY_PATH) -> dict[str, Any]:
-    """读取持久化记忆，并自动补录尚未进入记忆文件的历史 run。"""
+    """读取当前规划代次的记忆；重置后的代次不会重新导入旧运行。"""
     memory: dict[str, Any] = {"schema_version": 1, "experiments": []}
     if path.exists():
         try:
@@ -224,6 +231,10 @@ def load_experiment_memory(path: Path = EXPERIMENT_MEMORY_PATH) -> dict[str, Any
             item["do_not_repeat"] = [
                 f"不得原样重复实验 {item.get('id', 'unknown')} 的理论假设和补丁机制"
             ]
+
+    if memory.get("planning_generation") is not None:
+        memory["experiments"] = memory["experiments"][-100:]
+        return memory
 
     known_ids = {
         str(item.get("id"))
@@ -260,7 +271,8 @@ def save_experiment_record(
         item for item in memory.get("experiments", []) if item.get("id") != record["id"]
     ]
     experiments.append(record)
-    memory["schema_version"] = 1
+    memory.setdefault("schema_version", 2)
+    memory.setdefault("project_id", PROJECT.project_id)
     memory["experiments"] = experiments[-100:]
     write_json(path, memory)
 
@@ -271,10 +283,18 @@ def render_experiment_memory(
     max_chars: int = 30000,
 ) -> str:
     experiments = memory.get("experiments", [])
-    if not experiments:
+    archived_lessons = memory.get("archived_lessons", [])
+    if not experiments and not archived_lessons:
         return "无历史实验。"
     return compact_text(
-        json.dumps(experiments[-limit:], ensure_ascii=False, indent=2),
+        json.dumps(
+            {
+                "active_generation_experiments": experiments[-limit:],
+                "archived_lessons_read_only": archived_lessons[-40:],
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
         max_chars,
     )
 
@@ -292,11 +312,15 @@ def agent_state_snapshot(state: dict[str, Any]) -> dict[str, Any]:
         "status",
         "iteration_number",
         "planning_attempt",
+        "planning_generation",
+        "planning_objective",
     )
     snapshot = {key: state[key] for key in scalar_keys if key in state}
+    snapshot["project"] = PROJECT.prompt_payload()
     verification = state.get("current_verification", {})
     if isinstance(verification, dict):
         snapshot["current_metrics"] = verification.get("metrics", {})
+        snapshot["validation_summary"] = verification.get("validation", {})
 
     iteration = state.get("iteration", {})
     if isinstance(iteration, dict) and iteration:
@@ -356,58 +380,25 @@ def parse_verification_report(path: Path = REPORT_PATH) -> dict[str, float]:
 
 
 def read_matrix(path: Path) -> list[list[float]]:
-    with path.open(newline="", encoding="utf-8") as handle:
-        matrix = [[float(cell) for cell in row] for row in csv.reader(handle) if row]
-    if len(matrix) != 24 or any(len(row) != 24 for row in matrix):
-        raise RuntimeError(f"矩阵不是 24 x 24：{path.relative_to(ROOT)}")
-    return matrix
-
-
-def relative_block_error(actual: list[list[float]], expected: list[list[float]], rows: list[int], cols: list[int]) -> float:
-    difference = 0.0
-    reference = 0.0
-    for row in rows:
-        for col in cols:
-            delta = actual[row][col] - expected[row][col]
-            difference += delta * delta
-            reference += expected[row][col] * expected[row][col]
-    return math.sqrt(difference) / math.sqrt(reference) if reference > 0.0 else math.sqrt(difference)
+    try:
+        return read_square_matrix(path, PROJECT.matrix_size)
+    except ValueError as exc:
+        raise RuntimeError(str(exc)) from exc
 
 
 def dof_label(index: int) -> str:
-    names = ["ux", "uy", "uz", "rx", "ry", "rz"]
-    return f"n{index // 6 + 1}.{names[index % 6]}"
+    return PROJECT.dof_label(index)
 
 
 def matrix_diagnostics(actual_path: Path = CPP_MATRIX_PATH, expected_path: Path = ABAQUS_MATRIX_PATH) -> dict[str, Any]:
     actual = read_matrix(actual_path)
     expected = read_matrix(expected_path)
-    groups = {
-        "membrane_xy": [node * 6 + dof for node in range(4) for dof in (0, 1)],
-        "bending_shear": [node * 6 + dof for node in range(4) for dof in (2, 3, 4)],
-        "drilling": [node * 6 + 5 for node in range(4)],
-    }
-    block_errors: dict[str, float] = {}
-    for row_name, rows in groups.items():
-        for col_name, cols in groups.items():
-            block_errors[f"{row_name}__{col_name}"] = relative_block_error(actual, expected, rows, cols)
-
-    entries: list[dict[str, Any]] = []
-    for row in range(24):
-        for col in range(24):
-            difference = actual[row][col] - expected[row][col]
-            entries.append(
-                {
-                    "row": dof_label(row),
-                    "col": dof_label(col),
-                    "actual": actual[row][col],
-                    "expected": expected[row][col],
-                    "difference": difference,
-                    "absolute_difference": abs(difference),
-                }
-            )
-    entries.sort(key=lambda item: item["absolute_difference"], reverse=True)
-    return {"block_relative_errors": block_errors, "largest_absolute_entries": entries[:20]}
+    return build_matrix_diagnostics(
+        actual,
+        expected,
+        PROJECT.diagnostic_index_groups(),
+        dof_label,
+    )
 
 
 def compare_expected_metrics(
@@ -515,6 +506,21 @@ def evaluate_candidate_gate(
                 "limit": limit if before > 1.0e-12 else 1.0e-12,
             }
 
+    validation_before = baseline.get("validation", {})
+    validation_after = candidate.get("validation", {})
+    validation_required = bool(validation_before.get("ready", False))
+    validation_passed = True
+    validation_limit = None
+    if validation_required:
+        before_worst = float(validation_before["worst_frobenius_relative_error"])
+        after_worst = validation_after.get("worst_frobenius_relative_error")
+        validation_limit = before_worst * (1.0 + MAX_VALIDATION_ERROR_REGRESSION)
+        validation_passed = bool(
+            validation_after.get("ready", False)
+            and after_worst is not None
+            and float(after_worst) <= validation_limit
+        )
+
     passed = bool(
         test_passed
         and frobenius_improved
@@ -522,6 +528,7 @@ def evaluate_candidate_gate(
         and symmetry_passed
         and max_absolute_passed
         and not block_regressions
+        and validation_passed
     )
     return {
         "passed": passed,
@@ -551,7 +558,43 @@ def evaluate_candidate_gate(
             "passed": max_absolute_passed,
         },
         "non_target_block_regressions": block_regressions,
+        "validation": {
+            "required": validation_required,
+            "before": validation_before.get("worst_frobenius_relative_error"),
+            "after": validation_after.get("worst_frobenius_relative_error"),
+            "limit": validation_limit,
+            "passed": validation_passed,
+        },
     }
+
+
+def run_validation_verification(iteration_dir: Path, label: str) -> dict[str, Any]:
+    """只在存在 validation 样本时运行开发期批量门禁，永不读取 test。"""
+    dataset = load_dataset(ROOT / PROJECT.dataset_path, PROJECT)
+    if not dataset["validation"]:
+        return {
+            "ready": False,
+            "sample_count": 0,
+            "worst_frobenius_relative_error": None,
+        }
+    result_path = iteration_dir / f"dataset-{label}.json"
+    result = run_command(
+        [
+            sys.executable,
+            "-m",
+            "shell_agent",
+            "verify-dataset",
+            "--development",
+            "--result",
+            str(result_path.relative_to(ROOT)),
+        ],
+        iteration_dir / f"dataset-{label}.log",
+    )
+    if result.returncode != 0:
+        return {"ready": False, "exit_code": result.returncode}
+    payload = json.loads(result_path.read_text(encoding="utf-8"))
+    summary = payload["splits"]["validation"]["summary"]
+    return {**summary, "exit_code": 0}
 
 
 def run_verification(iteration_dir: Path, label: str) -> dict[str, Any]:
@@ -576,6 +619,10 @@ def run_verification(iteration_dir: Path, label: str) -> dict[str, Any]:
     if report_updated:
         outcome["metrics"] = parse_verification_report()
         outcome["diagnostics"] = matrix_diagnostics()
+        validation = run_validation_verification(iteration_dir, label)
+        outcome["validation"] = validation
+        if validation.get("exit_code", 0) != 0:
+            outcome["exit_code"] = int(validation["exit_code"])
     return outcome
 
 
@@ -639,6 +686,24 @@ def apply_unified_diff(diff: str, iteration_dir: Path) -> dict[str, Any]:
     return {"applied": applied.returncode == 0, "reason": "applied" if applied.returncode == 0 else "patch apply failed"}
 
 
+def backup_sources(iteration_dir: Path) -> Path:
+    """按项目配置备份本轮所有允许修改的源文件。"""
+    backup_root = iteration_dir / "source-backup"
+    for source in SOURCE_PATHS:
+        destination = backup_root / source.relative_to(ROOT)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, destination)
+    return backup_root
+
+
+def restore_sources(backup_root: Path) -> None:
+    for source in SOURCE_PATHS:
+        backup = backup_root / source.relative_to(ROOT)
+        if not backup.is_file():
+            raise RuntimeError(f"源文件备份不存在：{backup.relative_to(ROOT)}")
+        shutil.copy2(backup, source)
+
+
 def extract_json_object(text: str) -> dict[str, Any]:
     start = text.find("{")
     end = text.rfind("}")
@@ -667,15 +732,7 @@ def validate_experiment_plan(plan: dict[str, Any]) -> dict[str, Any]:
     if missing:
         raise ValueError(f"Experiment Planner 缺少字段：{missing}")
 
-    allowed_classes = {
-        "membrane",
-        "bending",
-        "transverse_shear",
-        "drilling",
-        "dof_mapping",
-        "local_coordinates",
-        "integration",
-    }
+    allowed_classes = set(PROJECT.experiment_classes)
     if plan["experiment_class"] not in allowed_classes:
         raise ValueError(
             "Experiment Planner 的 experiment_class 无效："
@@ -718,6 +775,8 @@ def experiment_planner_agent(
         [
             "# 当前状态",
             json.dumps(agent_state_snapshot(state), ensure_ascii=False, indent=2),
+            "# 项目配置（这是本轮规划边界，不得假定固定为 S4 或 24 x 24）",
+            json.dumps(PROJECT.prompt_payload(), ensure_ascii=False, indent=2),
             "# 当前矩阵诊断",
             json.dumps(
                 state["current_verification"].get("diagnostics", {}),
@@ -726,6 +785,8 @@ def experiment_planner_agent(
             ),
             "# 上一轮 Reviewer 或本地闸门反馈",
             previous_feedback or "无，这是第一轮。",
+            "# 本规划代次目标",
+            str(state.get("planning_objective", "继续降低当前项目的数值误差")),
             "# 跨运行历史实验记忆",
             render_experiment_memory(experiment_memory, limit=6, max_chars=12000),
         ]
@@ -751,14 +812,19 @@ def theory_agent(
         [
             "# 当前状态",
             json.dumps(agent_state_snapshot(state), ensure_ascii=False, indent=2),
+            "# 项目配置",
+            json.dumps(PROJECT.prompt_payload(), ensure_ascii=False, indent=2),
             "# 当前矩阵诊断",
             json.dumps(state["current_verification"].get("diagnostics", {}), ensure_ascii=False, indent=2),
             "# Experiment Planner 本轮计划",
             json.dumps(experiment_plan or {}, ensure_ascii=False, indent=2),
             "# 上一轮 Reviewer 反馈",
             previous_feedback or "无，这是第一轮。",
-            "# 当前 ShellStiffness.cpp",
-            read_limited(SOURCE_PATH, 9000),
+            "# 当前允许修改的实现文件",
+            "\n\n".join(
+                f"## {path.relative_to(ROOT)}\n{read_limited(path, 9000)}"
+                for path in SOURCE_PATHS
+            ),
             "# 历史实验说明",
             "Experiment Planner 已检查跨运行历史并把结论写入 difference_from_history 与 forbidden_changes。",
         ]
@@ -781,6 +847,8 @@ def developer_agent(
         [
             "# 当前状态",
             json.dumps(agent_state_snapshot(state), ensure_ascii=False, indent=2),
+            "# 项目配置",
+            json.dumps(PROJECT.prompt_payload(), ensure_ascii=False, indent=2),
             "# Theory Agent 诊断",
             theory_output,
             "# Experiment Planner 本轮计划",
@@ -792,9 +860,15 @@ def developer_agent(
             "# 输出协议纠正",
             correction or "首次生成：严格按提示词输出完整 unified diff。",
             "# 允许修改的当前文件",
-            read_limited(SOURCE_PATH, 50000),
+            "\n\n".join(
+                f"## {path.relative_to(ROOT)}\n{read_limited(path, 50000)}"
+                for path in SOURCE_PATHS
+            ),
             "# 当前测试约束",
-            read_limited(ROOT / "tests" / "shell_stiffness_tests.cpp", 5000),
+            "\n\n".join(
+                f"## {relative}\n{read_limited(ROOT / relative, 5000)}"
+                for relative in PROJECT.test_paths
+            ) or "未配置测试文件上下文。",
         ]
     )
     output = call_openai_agent(load_prompt("workflow/developer.system.md"), render_prompt("workflow/developer.user.md", context))
@@ -848,6 +922,8 @@ def reviewer_agent(
         [
             "# 迭代前状态",
             json.dumps(agent_state_snapshot(state), ensure_ascii=False, indent=2),
+            "# 项目配置",
+            json.dumps(PROJECT.prompt_payload(), ensure_ascii=False, indent=2),
             "# 候选前矩阵诊断",
             json.dumps(
                 state.get("current_verification", {}).get("diagnostics", {}),
@@ -872,7 +948,10 @@ def reviewer_agent(
 
 
 def restore_source(backup_path: Path, iteration_dir: Path) -> dict[str, Any]:
-    shutil.copy2(backup_path, SOURCE_PATH)
+    if backup_path.is_dir():
+        restore_sources(backup_path)
+    else:
+        shutil.copy2(backup_path, SOURCE_PATH)
     return run_verification(iteration_dir, "restored")
 
 
@@ -880,6 +959,9 @@ def make_summary(state: dict[str, Any]) -> str:
     lines = [
         "# 多 Agent 迭代报告",
         "",
+        f"- Project: `{PROJECT.project_id}`",
+        f"- Element type: `{PROJECT.element_type}`",
+        f"- Matrix dimensions: `{PROJECT.matrix_size} x {PROJECT.matrix_size}`",
         f"- Run ID: `{state['run_id']}`",
         f"- Runtime: `{state['runtime']}`",
         f"- Target error: `{state['target_error']}`",
@@ -1013,8 +1095,7 @@ def run_workflow(max_iterations: int, target_error: float) -> int:
 
         iteration_dir = run_dir / f"iteration-{iteration_number:02d}"
         iteration_dir.mkdir(parents=True, exist_ok=False)
-        backup_path = iteration_dir / "ShellStiffness.cpp.before"
-        shutil.copy2(SOURCE_PATH, backup_path)
+        backup_path = backup_sources(iteration_dir)
         iteration: dict[str, Any] = {"iteration": iteration_number, "before_error": state["current_error"]}
 
         console(f"[{iteration_number}/{max_iterations}] Theory Research Agent：诊断矩阵误差")
@@ -1041,7 +1122,7 @@ def run_workflow(max_iterations: int, target_error: float) -> int:
 
         candidate: dict[str, Any] = {"exit_code": -1}
         if iteration["patch_applied"]:
-            console(f"[{iteration_number}/{max_iterations}] Test Agent：编译、Catch2、Abaqus 误差比较")
+            console(f"[{iteration_number}/{max_iterations}] Test Agent：适配器测试与参考矩阵误差比较")
             candidate = run_verification(iteration_dir, "candidate")
         iteration["test_passed"] = candidate.get("exit_code") == 0
         if "metrics" in candidate:

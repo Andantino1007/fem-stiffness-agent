@@ -32,6 +32,13 @@ python -m shell_agent verify
 python -m shell_agent run --max-iterations 3 --target-error 0.01
 ```
 
+归档当前活动记忆并只让 Planner 重新规划：
+
+```bash
+python -m shell_agent reset-plan --reason "切换单元或数据契约"
+python -m shell_agent replan
+```
+
 默认引擎为 `langgraph`。接口节点失败时退出码为 `3`，终端会打印恢复命令：
 
 ```bash
@@ -58,7 +65,7 @@ LangGraph 运行命令会自动先执行同样的接口预检节点。
 python -m shell_agent legacy --max-iterations 3 --target-error 0.01
 ```
 
-正式自动迭代只允许开发智能体修改 `src/shell/ShellStiffness.cpp`。补丁先经过路径和危险调用校验，再经过 `git apply --check --recount`、C++/Catch2、真实 Abaqus 误差比较和评审决策。未改善时自动恢复。
+正式自动迭代只允许开发智能体修改项目配置 `agent.allowed_patch_paths` 中的文件。补丁先经过路径和危险调用校验，再经过 `git apply --check --recount`、适配器测试、可信参考矩阵误差比较和评审决策。未改善时自动恢复。
 
 退出码 `0` 表示至少接受一轮改进或已经达到目标；退出码 `2` 表示本批次没有改进被接受，候选代码已经回滚。
 

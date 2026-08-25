@@ -2,9 +2,22 @@
 
 本目录保存多智能体工作流的持久化状态、检查点和运行审计记录。
 
+`project.json` 是当前项目的唯一配置入口，声明单元类型、矩阵尺寸、数据集、适配器、诊断分组、补丁白名单和验收门槛。`project.example.json` 展示非 24 x 24 单元如何通过外部命令适配器接入。
+
+## 规划代次
+
+切换单元、尺寸、数据契约或算法大方向时运行：
+
+```bash
+python -m shell_agent reset-plan --reason "说明新目标"
+python -m shell_agent replan
+```
+
+重置会把当前活动记忆、规划状态和最新报告复制到 `archive/`，不会删除 `runs/`。新的 `planning_generation` 使用空实验记忆，旧实验不参与 Duplicate Gate。Planner-only 结果写入 `plans/`。
+
 ## 长期实验记忆
 
-`experiment-memory.json` 最多保留最近一百轮实验的压缩记录，包括修改前后误差、补丁指纹、评审结论、失败机理、禁止重复项、下一步焦点和候选分块误差。
+`experiment-memory.json` 最多保留当前规划代次最近一百轮实验的压缩记录，包括修改前后误差、补丁指纹、评审结论、失败机理、禁止重复项、下一步焦点和候选分块误差。
 
 实验规划智能体读取近期记忆，避免重复已被证伪的补丁。被接受和被拒绝的实验都会记录，但只有经过本地硬门槛与评审的补丁才会保留在源码中。
 
@@ -28,7 +41,7 @@ workflow/runs/run-YYYYMMDD-HHMMSS/
 ├── summary.md                         中文汇总
 ├── verification-baseline.log          基线验证日志
 └── iteration-01/
-    ├── ShellStiffness.cpp.before      修改前源码备份
+    ├── source-backup/                 白名单源码的目录化备份
     ├── experiment-plan.json           实验计划
     ├── theory-analysis.md              理论分析
     ├── developer.patch                候选补丁

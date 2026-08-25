@@ -1,12 +1,13 @@
 # 数据目录
 
-本目录保存需求2的样本输入、Abaqus 基准矩阵、样本元数据和 C++ 输出矩阵。所有数值对比都应以这里的样本契约为准。
+本目录保存样本输入、可信参考矩阵、样本元数据和实现输出矩阵。公共契约支持项目配置声明的任意方阵尺寸；当前 `abaqus/` 和 `cpp/` 是 S4 示例数据。
 
 ## 目录结构
 
 ```text
 data/
 ├── datasets/               训练集、验证集和测试集划分清单
+├── templates/              通用样本元数据和数据集模板
 ├── abaqus/
 │   ├── input/      Abaqus 输入文件
 │   ├── matrix/     Abaqus 导出的 24 x 24 基准矩阵
@@ -35,13 +36,15 @@ data/abaqus/matrix/<sample_id>_abaqus_s4.csv
 data/cpp/<sample_id>_cpp.csv
 ```
 
-矩阵 CSV 必须满足：
+当前 S4 示例矩阵 CSV 必须满足：
 
 - 恰好 24 行、每行 24 个数值。
 - 不带行名、列名和额外表头。
 - 自由度顺序与元数据一致。
 - Abaqus 与 C++ 使用相同单位制。
 - 基准矩阵来源必须记录在对应元数据中。
+
+其他单元的矩阵尺寸取自 `workflow/project.json` 的 `matrix_dimensions`，样本使用 `reference_matrix` 和 `implementation_matrix` 两个通用字段。完整格式见 `docs/USER_GUIDE.md` 和 `data/templates/`。
 
 ## 新增样本建议
 

@@ -1,4 +1,4 @@
-"""训练集/测试集批量 C++ 数值验证。"""
+"""配置驱动的训练集、验证集和测试集批量数值验证。"""
 
 from __future__ import annotations
 
@@ -10,12 +10,14 @@ from typing import Any
 from .verification import (
     BUILD_DIR,
     ROOT,
-    compile_verification_binaries,
-    run_checked,
+    evaluate_sample,
+    prepare_adapter,
+    run_adapter_tests,
 )
+from .project_config import DEFAULT_PROJECT_PATH, ProjectConfig, load_project_config
 
 
-DEFAULT_DATASET = ROOT / "data" / "datasets" / "shell_stiffness.json"
+DEFAULT_DATASET = ROOT / load_project_config().dataset_path
 DEFAULT_DATASET_RESULT = BUILD_DIR / "dataset-results.json"
 METRIC_LABELS = {
     "frobenius_relative_error": "Frobenius relative error",
@@ -25,11 +27,22 @@ METRIC_LABELS = {
 }
 
 
-def load_dataset(path: Path = DEFAULT_DATASET) -> dict[str, Any]:
+def load_dataset(
+    path: Path = DEFAULT_DATASET,
+    project: ProjectConfig | None = None,
+) -> dict[str, Any]:
     path = path if path.is_absolute() else ROOT / path
     payload = json.loads(path.read_text(encoding="utf-8"))
-    if payload.get("schema_version") != 1:
-        raise ValueError("数据集 schema_version 必须为 1")
+    if payload.get("schema_version") not in {1, 2}:
+        raise ValueError("数据集 schema_version 必须为 1 或 2")
+    if payload.get("schema_version") == 2:
+        project_id = payload.get("project_id")
+        if not isinstance(project_id, str) or not project_id.strip():
+            raise ValueError("数据集 schema_version 2 必须提供 project_id")
+        if project is not None and project_id != project.project_id:
+            raise ValueError(
+                f"数据集 project_id={project_id} 与当前项目 {project.project_id} 不一致"
+            )
     train = payload.get("train")
     validation = payload.get("validation")
     test = payload.get("test")
@@ -87,37 +100,39 @@ def run_dataset_verification(
     dataset_path: Path = DEFAULT_DATASET,
     result_path: Path = DEFAULT_DATASET_RESULT,
     require_test: bool = False,
+    project_path: Path = DEFAULT_PROJECT_PATH,
+    development_only: bool = False,
 ) -> int:
-    """编译一次并验证训练/测试划分中的所有样本。"""
+    """构建一次适配器并验证三个互斥数据集划分。"""
     try:
-        dataset = load_dataset(dataset_path)
+        project = load_project_config(project_path)
+        dataset = load_dataset(dataset_path, project)
     except (OSError, json.JSONDecodeError, ValueError) as exc:
         print(f"Dataset configuration error: {exc}")
         return 4
 
-    code, cli_path, tests_path = compile_verification_binaries()
+    code, runtime = prepare_adapter(project)
     if code != 0:
         return code
 
     result: dict[str, Any] = {
-        "schema_version": 1,
+        "schema_version": 2,
+        "project_id": project.project_id,
+        "element_type": project.element_type,
+        "matrix_dimensions": list(project.matrix_dimensions),
         "dataset": str((dataset_path if dataset_path.is_absolute() else ROOT / dataset_path).relative_to(ROOT)),
         "splits": {},
+        "evaluation_scope": "train_validation" if development_only else "all",
     }
     reports_dir = BUILD_DIR / "dataset-reports"
     for split in ("train", "validation", "test"):
         samples: list[dict[str, Any]] = []
-        for relative in dataset[split]:
+        selected = not development_only or split != "test"
+        for relative in dataset[split] if selected else []:
             meta_path = ROOT / relative
             identifier = sample_id(meta_path)
             report_path = reports_dir / split / f"{identifier}.md"
-            code = run_checked(
-                [
-                    str(cli_path),
-                    str(meta_path.relative_to(ROOT)),
-                    str(report_path.relative_to(ROOT)),
-                ]
-            )
+            code = evaluate_sample(project, runtime, meta_path, report_path)
             if code != 0:
                 return code
             samples.append(
@@ -133,12 +148,14 @@ def run_dataset_verification(
             "summary": summarize_split(samples),
         }
 
-    code = run_checked([str(tests_path)])
+    code = run_adapter_tests(project, runtime)
     if code != 0:
         return code
 
     result["validation_ready"] = bool(result["splits"]["validation"]["summary"]["ready"])
-    result["test_ready"] = bool(result["splits"]["test"]["summary"]["ready"])
+    result["test_ready"] = bool(
+        not development_only and result["splits"]["test"]["summary"]["ready"]
+    )
     test_lock_valid = False
     test_lock_message = "测试集为空"
     if result["test_ready"]:
@@ -148,7 +165,10 @@ def run_dataset_verification(
     result["test_lock_valid"] = test_lock_valid
     result["test_lock_message"] = test_lock_message
     result["final_evaluation_ready"] = bool(
-        result["validation_ready"] and result["test_ready"] and test_lock_valid
+        not development_only
+        and result["validation_ready"]
+        and result["test_ready"]
+        and test_lock_valid
     )
     result_path = result_path if result_path.is_absolute() else ROOT / result_path
     result_path.parent.mkdir(parents=True, exist_ok=True)
@@ -167,6 +187,8 @@ def run_dataset_verification(
     if result["test_ready"]:
         print(f"Test: {test_summary['sample_count']} sample(s), worst error={test_summary['worst_frobenius_relative_error']}")
         print(f"Test lock: {'valid' if test_lock_valid else 'invalid'} ({test_lock_message})")
+    elif development_only:
+        print("Test: skipped (development scope never evaluates the locked test set)")
     else:
         print("Test: 0 sample(s), test_ready=false (需要新增独立 Abaqus 基准)")
     print(f"Result: {result_path.relative_to(ROOT)}")

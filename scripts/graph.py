@@ -19,7 +19,9 @@ from agents import (
     ROOT,
     RUNS_DIR,
     SOURCE_PATH,
+    PROJECT,
     apply_unified_diff,
+    backup_sources,
     build_experiment_record,
     compare_expected_metrics,
     console,
@@ -30,6 +32,7 @@ from agents import (
     load_experiment_memory,
     progress_agent,
     reviewer_agent,
+    restore_sources,
     run_verification,
     save_experiment_record,
     theory_agent,
@@ -144,9 +147,9 @@ def planner_node(state: GraphState) -> dict[str, Any]:
     planner_state = {**state, "runtime": runtime}
     iteration_dir = state_iteration_dir(state)
     iteration_dir.mkdir(parents=True, exist_ok=True)
-    backup_path = iteration_dir / "ShellStiffness.cpp.before"
+    backup_path = iteration_dir / "source-backup"
     if not backup_path.exists():
-        shutil.copy2(SOURCE_PATH, backup_path)
+        backup_sources(iteration_dir)
     attempt = state.get("planning_attempt", 0) + 1
     console(
         f"[{number}/{state['max_iterations']}] "
@@ -317,7 +320,7 @@ def candidate_test_node(state: GraphState) -> dict[str, Any]:
     number = state["iteration_number"]
     console(f"[{number}/{state['max_iterations']}] Patch Validate + Test Agent")
     iteration_dir = state_iteration_dir(state)
-    backup_path = iteration_dir / "ShellStiffness.cpp.before"
+    backup_path = iteration_dir / "source-backup"
     iteration = dict(state["iteration"])
     candidate: dict[str, Any] = {"exit_code": -1}
 
@@ -333,7 +336,7 @@ def candidate_test_node(state: GraphState) -> dict[str, Any]:
             else:
                 iteration["failure"] = apply_result["reason"]
     finally:
-        shutil.copy2(backup_path, SOURCE_PATH)
+        restore_sources(backup_path)
         restored = run_verification(iteration_dir, "restored")
         if restored["exit_code"] != 0:
             raise RuntimeError("恢复上一有效版本后验证失败")
@@ -411,11 +414,11 @@ def decision_node(state: GraphState) -> dict[str, Any]:
         return updates
 
     iteration_dir = state_iteration_dir(state)
-    backup_path = iteration_dir / "ShellStiffness.cpp.before"
+    backup_path = iteration_dir / "source-backup"
     apply_result = apply_unified_diff(state["developer_diff"], iteration_dir)
     committed = run_verification(iteration_dir, "committed") if apply_result["applied"] else {"exit_code": -1}
     if committed.get("exit_code") != 0:
-        shutil.copy2(backup_path, SOURCE_PATH)
+        restore_sources(backup_path)
         run_verification(iteration_dir, "commit-restored")
         iteration["accepted"] = False
         iteration["failure"] = "接受后重新应用或复验失败"
@@ -424,7 +427,7 @@ def decision_node(state: GraphState) -> dict[str, Any]:
 
     committed_error = committed["metrics"]["frobenius_relative_error"]
     if abs(committed_error - float(candidate_error)) > 1.0e-9:
-        shutil.copy2(backup_path, SOURCE_PATH)
+        restore_sources(backup_path)
         run_verification(iteration_dir, "commit-restored")
         iteration["accepted"] = False
         iteration["failure"] = "提交复验误差与候选误差不一致"
@@ -576,6 +579,7 @@ def initial_state(run_id: str, max_iterations: int, target_error: float) -> Grap
         "target_error": target_error,
         "max_iterations": max_iterations,
         "status": "initializing",
+        "project_id": PROJECT.project_id,
     }
 
 

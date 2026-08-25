@@ -1,0 +1,23 @@
+*HEADING
+s4_train_002_long_rectangle: S4 stiffness matrix, 6-by-1 rectangle, train split
+**
+** Node order: 1-2-3-4 counterclockwise
+** DOF order: ux uy uz urx ury urz for each node
+** Geometry: long rectangle with aspect ratio 6:1
+**
+*NODE
+1, 0.0, 0.0, 0.0
+2, 6.0, 0.0, 0.0
+3, 6.0, 1.0, 0.0
+4, 0.0, 1.0, 0.0
+*ELEMENT, TYPE=S4, ELSET=EALL
+1, 1, 2, 3, 4
+*MATERIAL, NAME=STEEL
+*ELASTIC
+210000000000.0, 0.3
+*SHELL SECTION, ELSET=EALL, MATERIAL=STEEL
+0.01
+*STEP, NAME=EXPORT_STIFFNESS
+*MATRIX GENERATE, STIFFNESS
+*MATRIX OUTPUT, STIFFNESS, FORMAT=COORDINATE
+*END STEP

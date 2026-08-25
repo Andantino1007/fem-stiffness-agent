@@ -125,3 +125,42 @@
 - 当前误差：`0.0813914`
 - 已接受迭代：`1`
 - 报告：`workflow/runs/stage3-lg-20260724-133115/summary.md`
+
+## 2026-08-10：多 Agent 自动迭代 `run-20260810-102940`
+
+- 状态：`no_improvement_accepted`
+- 初始误差：`0.0595967`
+- 当前误差：`0.0595967`
+- 已接受迭代：`0`
+- 报告：`workflow/runs/run-20260810-102940/summary.md`
+
+## 2026-08-10：多 Agent 自动迭代 `run-20260810-155336`
+
+- 状态：`no_improvement_accepted`
+- 初始误差：`0.0595967`
+- 当前误差：`0.0595967`
+- 已接受迭代：`0`
+- 报告：`workflow/runs/run-20260810-155336/summary.md`
+
+## 2026-08-19：规划代次重置为 `1`
+
+- 项目：`abaqus-s4-stiffness`
+- 状态：`awaiting_replan`
+- 原因：切换为配置驱动的通用单元矩阵工具流；保留 S4 作为首个适配器，并基于新架构、单元类型、矩阵尺寸和数据集重新规划
+- 归档：`workflow/archive/planning-generation-0-20260819-112804`
+
+## 2026-08-19：规划代次重置为 `2`
+
+- 项目：`abaqus-s4-stiffness`
+- 状态：`awaiting_replan`
+- 原因：通用工具流规划重启：清空当前代次候选与补丁指纹，但保留旧 S4 实验的只读失败教训，要求 Planner 避免重复已证伪方向
+- 归档：`workflow/archive/planning-generation-1-20260819-113410`
+
+## 2026-08-19：Planner-only 重新规划 `replan-g2-20260819-113431`
+
+- 状态：`planned`
+- 基线误差：`0.0595967`
+- 实验类别：`drilling`
+- 主指标：`drilling__drilling`
+- 计划：`workflow/plans/replan-g2-20260819-113431/experiment-plan.json`
+- 说明：只运行基线和 Planner，未调用 Developer，未修改数值源码。

@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "project_id": "abaqus-s4-stiffness",
+  "element_type": "Abaqus S4",
+  "matrix_dimensions": [
+    24,
+    24
+  ],
+  "planning_generation": 2,
+  "status": "planned",
+  "reset_at": "2026-08-19T11:34:10+08:00",
+  "reset_reason": "通用工具流规划重启：清空当前代次候选与补丁指纹，但保留旧 S4 实验的只读失败教训，要求 Planner 避免重复已证伪方向",
+  "archive": "workflow/archive/planning-generation-1-20260819-113410",
+  "archived_files": [
+    "workflow/experiment-memory.json",
+    "workflow/planning-state.json",
+    "docs/verification/agent-latest.md"
+  ],
+  "latest_plan": "workflow/plans/replan-g2-20260819-113431/experiment-plan.json",
+  "planned_at": "2026-08-19T11:35:01+08:00",
+  "baseline_error": 0.0595967,
+  "latest_plan_run": "replan-g2-20260819-113431"
+}
