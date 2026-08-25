@@ -7,6 +7,8 @@
 - `input/`：Abaqus `.inp` 文件，包括普通模型、矩阵生成和反力法备用方案。
 - `matrix/`：由 Abaqus 导出并转换得到的 `24 x 24` CSV。
 - `meta/`：节点、材料、厚度、自由度顺序和导出来源。
+- `raw/`：Abaqus 直接导出的可追溯文本 `.mtx`。
+- `evidence/`：确认矩阵输出、分析完成和错误计数的精简 `.msg` 日志。
 
 ## 推荐导出方法
 
@@ -14,9 +16,9 @@
 
 ```text
 MATRIX GENERATE
--> X1.sim
--> abaqus mtxasm job=<X1作业名> text
--> *_STIF-1.mtx
+-> 直接生成 *_STIF1.mtx，或 X1.sim
+-> 仅在没有文本矩阵时运行 abaqus mtxasm job=<X1作业名> text
+-> *_STIF*.mtx
 -> scripts/abaqus/convert_abaqus_mtx_to_csv.py
 ```
 

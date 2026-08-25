@@ -6,13 +6,14 @@
 - 节点i, 自由度i, 节点j, 自由度j, 数值
 
 第二种格式适用于 Abaqus 坐标矩阵输出，因为它保留了节点和自由度标签。
-脚本会自动补齐非对角项，使矩阵保持对称。
+脚本会自动补齐缺失的非对角项；若输入已包含完整对称矩阵，则不会重复累加。
 """
 
 from __future__ import annotations
 
 import csv
 import glob
+import math
 import re
 import sys
 from pathlib import Path
@@ -39,14 +40,45 @@ def parse_numbers(line: str) -> list[float]:
     return [float(item) for item in re.findall(r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[EeDd][-+]?\d+)?", cleaned.replace("D", "E"))]
 
 
-def add_entry(matrix: list[list[float]], row: int, col: int, value: float) -> None:
+def add_entry(
+    matrix: list[list[float]],
+    present: list[list[bool]],
+    row: int,
+    col: int,
+    value: float,
+) -> None:
     matrix[row][col] += value
-    if row != col:
-        matrix[col][row] += value
+    present[row][col] = True
+
+
+def complete_symmetric_matrix(
+    matrix: list[list[float]], present: list[list[bool]]
+) -> None:
+    for row in range(SIZE):
+        for col in range(row + 1, SIZE):
+            forward = present[row][col]
+            reverse = present[col][row]
+            if forward and reverse:
+                if not math.isclose(
+                    matrix[row][col], matrix[col][row], rel_tol=1e-10, abs_tol=1e-8
+                ):
+                    raise ValueError(
+                        "inconsistent symmetric entries at "
+                        f"({row + 1}, {col + 1}) and ({col + 1}, {row + 1}): "
+                        f"{matrix[row][col]} != {matrix[col][row]}"
+                    )
+                value = 0.5 * (matrix[row][col] + matrix[col][row])
+                matrix[row][col] = value
+                matrix[col][row] = value
+            elif forward:
+                matrix[col][row] = matrix[row][col]
+            elif reverse:
+                matrix[row][col] = matrix[col][row]
 
 
 def convert(input_path: Path, output_path: Path) -> None:
     matrix = [[0.0 for _ in range(SIZE)] for _ in range(SIZE)]
+    present = [[False for _ in range(SIZE)] for _ in range(SIZE)]
     entries = 0
 
     for line_no, line in enumerate(input_path.read_text(encoding="utf-8", errors="ignore").splitlines(), start=1):
@@ -68,11 +100,13 @@ def convert(input_path: Path, output_path: Path) -> None:
         else:
             continue
 
-        add_entry(matrix, row, col, value)
+        add_entry(matrix, present, row, col, value)
         entries += 1
 
     if entries == 0:
         raise ValueError(f"no matrix entries parsed from {input_path}")
+
+    complete_symmetric_matrix(matrix, present)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", newline="", encoding="utf-8") as handle:

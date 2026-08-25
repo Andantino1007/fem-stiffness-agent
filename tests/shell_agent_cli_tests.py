@@ -210,6 +210,7 @@ class ShellAgentCliTests(unittest.TestCase):
             Path("data/abaqus/meta/sample_001.json")
         )
         self.assertEqual(artifact["sample_id"], "sample_001")
+        self.assertEqual(artifact["meta_relative"], "data/abaqus/meta/sample_001.json")
         passed, message = check_test_lock()
         self.assertFalse(passed)
         self.assertIn("为空", message)

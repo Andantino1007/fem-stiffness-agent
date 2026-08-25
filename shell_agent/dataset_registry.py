@@ -55,7 +55,7 @@ def validate_sample_artifacts(
         "sample_id": identifier,
         "meta_path": meta_path,
         "matrix_path": matrix_path,
-        "meta_relative": str(meta_path.relative_to(ROOT)),
+        "meta_relative": meta_path.relative_to(ROOT).as_posix(),
         "matrix_relative": matrix_relative,
     }
 

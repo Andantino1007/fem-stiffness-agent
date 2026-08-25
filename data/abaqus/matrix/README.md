@@ -1,6 +1,8 @@
 # Abaqus 刚度矩阵
 
-`sample_001_abaqus_s4.csv` 是 `sample_001` 的真实 Abaqus S4 基准刚度矩阵。
+本目录中的 `sample_001_abaqus_s4.csv` 和四个 `s4_*_abaqus_s4.csv` 均为真实 Abaqus S4 基准刚度矩阵。
+
+新增矩阵覆盖远点梯形、`6 x 1` 长方形、节点下拉畸变单元和斜平行四边形。对应原始 `.mtx`、作业日志及解析条目数见 `data/abaqus/raw/`、`data/abaqus/evidence/` 和各自元数据。
 
 生成链路：
 
