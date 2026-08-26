@@ -76,6 +76,21 @@ TEST_CASE("shell implementation preserves rigid translations", "[stiffness]") {
     }
 }
 
+TEST_CASE("shell implementation accepts a warped quadrilateral", "[stiffness][warped]") {
+    const auto input = shell::readShellElementInput("data/abaqus/meta/s4_train_003_node_down.json");
+    const auto matrix = shell::computeShellElementStiffness(input);
+
+    REQUIRE(shell::symmetryError(matrix) < 1.0e-12);
+    double largestAbsolute = 0.0;
+    for (std::size_t row = 0; row < shell::Matrix24::kSize; ++row) {
+        for (std::size_t col = 0; col < shell::Matrix24::kSize; ++col) {
+            REQUIRE(std::isfinite(matrix(row, col)));
+            largestAbsolute = std::max(largestAbsolute, std::abs(matrix(row, col)));
+        }
+    }
+    REQUIRE(largestAbsolute > 0.0);
+}
+
 TEST_CASE("shell implementation rejects invalid material input", "[stiffness]") {
     auto input = shell::readShellElementInput("data/abaqus/meta/sample_001.json");
     input.poissonRatio = 0.5;

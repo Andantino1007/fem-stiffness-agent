@@ -3,7 +3,7 @@
   "project_id": "abaqus-s4-stiffness",
   "element_type": "Abaqus S4",
   "batch_id": "s4-distorted-train-001",
-  "purpose": "用三个强几何变化的 S4 单元扩充训练集：远点梯形、长方形和节点下拉",
+  "purpose": "用三个强几何变化的 S4 单元扩充训练集：远点梯形、长方形，以及节点 1 沿 Z 负方向拉到原平面下方形成的非共面翘曲四边形",
   "split": "train",
   "selection_policy": "coverage_driven",
   "generation_method": "matrix_generate",
@@ -29,8 +29,9 @@
     {
       "sample_id": "s4_train_003_node_down",
       "input_file": "data/abaqus/input/s4_train_003_node_down_matrix_export.inp",
-      "geometry_case": "node_pulled_down",
-      "nodes": [[0.0, -4.0, 0.0], [1.0, 0.0, 0.0], [1.0, 1.0, 0.0], [0.0, 1.0, 0.0]],
+      "geometry_case": "node_1_negative_z_warped",
+      "geometry_description": "节点 1 沿 Z 负方向拉到原平面下方，形成非共面翘曲四边形",
+      "nodes": [[0.0, 0.0, -4.0], [1.0, 0.0, 0.0], [1.0, 1.0, 0.0], [0.0, 1.0, 0.0]],
       "E": 210000000000.0,
       "nu": 0.3,
       "thickness": 0.01

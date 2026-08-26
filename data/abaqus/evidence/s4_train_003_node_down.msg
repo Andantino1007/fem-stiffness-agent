@@ -1,9 +1,9 @@
 1
 
-   Abaqus 2024                                  Date 26-Aug-2026   Time 01:54:53
+   Abaqus 2024                                  Date 26-Aug-2026   Time 11:04:29
    For use by WhiteDeath under license from Dassault Systemes or its subsidiary.
 
- s4_train_003_node_down: S4 stiffness matrix, node 1 pulled downward, train split
+ s4_train_003_node_down: S4 stiffness matrix, node 1 pulled below the plane in ne
                                                                                  
  STEP    1     INCREMENT     1     STEP TIME    0.00    
  
@@ -38,7 +38,7 @@
                        1  REORDERING OF EQUATIONS TO MINIMIZE WAVEFRONT
                        0  ADDITIONAL RESIDUAL EVALUATIONS FOR LINE SEARCHES
                        0  ADDITIONAL OPERATOR EVALUATIONS FOR LINE SEARCHES
-                       1  WARNING MESSAGES DURING USER INPUT PROCESSING
+                       2  WARNING MESSAGES DURING USER INPUT PROCESSING
                        0  WARNING MESSAGES DURING ANALYSIS
                        0  ANALYSIS WARNINGS ARE NUMERICAL PROBLEM MESSAGES
                        0  ANALYSIS WARNINGS ARE NEGATIVE EIGENVALUE MESSAGES

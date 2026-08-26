@@ -164,3 +164,13 @@
 - 主指标：`drilling__drilling`
 - 计划：`workflow/plans/replan-g2-20260819-113431/experiment-plan.json`
 - 说明：只运行基线和 Planner，未调用 Developer，未修改数值源码。
+
+## 2026-08-26：003 面外翘曲样本修正与验证
+
+- 几何修正为 `(0,0,-4) (1,0,0) (1,1,0) (0,1,0)`；节点 1 到 `z=0` 平面距离为 `4`。
+- Abaqus 2024 通过 `*MATRIX GENERATE` 和坐标格式 `*MATRIX OUTPUT` 直接生成 `STIF1.mtx`，未使用 `mtxasm`。
+- 作业结果：0 errors；2 条输入警告，分别为单元畸变和 curved/warped 法向夹角超过 10 度；分析阶段 0 warnings。
+- 原始矩阵解析 576 条，转换 CSV 为 `24 x 24`、有限、非零、对称，且与 `.mtx` 条目一致。
+- C++ 增加非共面平均平面局部几何，003 指标为 Frobenius `0.365536`、最大绝对误差 `8.66088e+08`、对称性误差 `1.0391e-16`。
+- 开发数据集训练平均误差为 `0.220593675`，最差样本为 003；validation 最差误差为 `0.209217`，test 未读取。
+- `python -m shell_agent check`、34 个 Python 测试以及 C++ 7 个测试用例、621 个断言全部通过。

@@ -30,6 +30,7 @@ build/
 *.stt
 /*.msg
 /*_STIF1.mtx
+!data/abaqus/evidence/*.dat
 
 # LangGraph 本地 checkpoint
 workflow/checkpoints/*.sqlite

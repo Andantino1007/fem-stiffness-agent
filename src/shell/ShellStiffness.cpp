@@ -82,9 +82,14 @@ void validateInput(const ShellElementInput& input) {
 }
 
 LocalGeometry buildLocalGeometry(const ShellElementInput& input) {
-    const Vector3 origin = nodeCoordinate(input.nodes[0]);
-    const Vector3 edge12 = subtract(nodeCoordinate(input.nodes[1]), origin);
-    const Vector3 edge14 = subtract(nodeCoordinate(input.nodes[3]), origin);
+    std::array<Vector3, kNodeCount> points{};
+    for (std::size_t node = 0; node < kNodeCount; ++node) {
+        points[node] = nodeCoordinate(input.nodes[node]);
+    }
+
+    Vector3 origin = points[0];
+    const Vector3 edge12 = subtract(points[1], origin);
+    const Vector3 edge14 = subtract(points[3], origin);
 
     LocalGeometry geometry;
     geometry.basis[0] = normalize(edge12, "node 1 and node 2 coincide");
@@ -92,14 +97,40 @@ LocalGeometry buildLocalGeometry(const ShellElementInput& input) {
     geometry.basis[1] = normalize(cross(geometry.basis[2], geometry.basis[0]), "local y axis is invalid");
 
     double characteristicLength = 0.0;
+    double largestOutOfPlane = 0.0;
     for (std::size_t node = 0; node < kNodeCount; ++node) {
-        const Vector3 relative = subtract(nodeCoordinate(input.nodes[node]), origin);
-        geometry.coordinates[node] = {dot(relative, geometry.basis[0]), dot(relative, geometry.basis[1])};
+        const Vector3 relative = subtract(points[node], origin);
         characteristicLength = std::max(characteristicLength, norm(relative));
-        const double outOfPlane = std::abs(dot(relative, geometry.basis[2]));
-        if (outOfPlane > 1.0e-9 * std::max(1.0, characteristicLength)) {
-            throw std::runtime_error("shell stiffness implementation currently requires a planar quadrilateral");
+        largestOutOfPlane = std::max(largestOutOfPlane, std::abs(dot(relative, geometry.basis[2])));
+    }
+
+    const bool warped = largestOutOfPlane > 1.0e-9 * std::max(1.0, characteristicLength);
+    if (warped) {
+        origin = {};
+        for (const Vector3& point : points) {
+            for (std::size_t axis = 0; axis < 3; ++axis) {
+                origin[axis] += 0.25 * point[axis];
+            }
         }
+
+        const Vector3 xiTangent = {
+            -points[0][0] + points[1][0] + points[2][0] - points[3][0],
+            -points[0][1] + points[1][1] + points[2][1] - points[3][1],
+            -points[0][2] + points[1][2] + points[2][2] - points[3][2],
+        };
+        const Vector3 etaTangent = {
+            -points[0][0] - points[1][0] + points[2][0] + points[3][0],
+            -points[0][1] - points[1][1] + points[2][1] + points[3][1],
+            -points[0][2] - points[1][2] + points[2][2] + points[3][2],
+        };
+        geometry.basis[0] = normalize(xiTangent, "center xi tangent is invalid");
+        geometry.basis[2] = normalize(cross(xiTangent, etaTangent), "center tangents are collinear");
+        geometry.basis[1] = normalize(cross(geometry.basis[2], geometry.basis[0]), "local y axis is invalid");
+    }
+
+    for (std::size_t node = 0; node < kNodeCount; ++node) {
+        const Vector3 relative = subtract(points[node], origin);
+        geometry.coordinates[node] = {dot(relative, geometry.basis[0]), dot(relative, geometry.basis[1])};
     }
     return geometry;
 }

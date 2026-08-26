@@ -3,8 +3,9 @@
   "element_type": "Abaqus S4",
   "node_order": "counterclockwise",
   "dof_order_per_node": ["x", "y", "z", "rx", "ry", "rz"],
+  "geometry_description": "节点 1 沿 Z 负方向拉到原平面下方，形成非共面翘曲四边形",
   "nodes": [
-    {"id": 1, "coord": [0.0, -4.0, 0.0]},
+    {"id": 1, "coord": [0.0, 0.0, -4.0]},
     {"id": 2, "coord": [1.0, 0.0, 0.0]},
     {"id": 3, "coord": [1.0, 1.0, 0.0]},
     {"id": 4, "coord": [0.0, 1.0, 0.0]}
@@ -26,7 +27,14 @@
     "source_mtx_name": "s4_train_003_node_down_STIF1.mtx",
     "source_mtx": "data/abaqus/raw/s4_train_003_node_down_STIF1.mtx",
     "evidence_log": "data/abaqus/evidence/s4_train_003_node_down.msg",
-    "parsed_entries": 376
+    "warning_log": "data/abaqus/evidence/s4_train_003_node_down.dat",
+    "error_messages": 0,
+    "warning_messages": 2,
+    "warnings": [
+      "1 element is distorted: the isoparametric angles are outside suggested limits or the quality measure is bad.",
+      "1 element is curved/warped: the angle between the average element normal and a nodal normal exceeds 10 degrees."
+    ],
+    "parsed_entries": 576
   },
   "abaqus_matrix": "data/abaqus/matrix/s4_train_003_node_down_abaqus_s4.csv",
   "cpp_matrix": "data/cpp/s4_train_003_node_down_cpp.csv"

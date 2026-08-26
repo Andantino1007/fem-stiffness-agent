@@ -14,7 +14,7 @@
 - 面内/弯曲：2 x 2 Gauss 积分
 - 横向剪切：2 x 2 Gauss 积分
 - 钻转：罚刚度 alpha=0.0085
-- 几何范围：平面四边形
+- 几何范围：平面四边形；非共面四边形使用单元中心平均平面近似
 
 ## 文件清单
 - Abaqus matrix: data/abaqus/matrix/sample_001_abaqus_s4.csv

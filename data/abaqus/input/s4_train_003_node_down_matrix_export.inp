@@ -1,12 +1,12 @@
 *HEADING
-s4_train_003_node_down: S4 stiffness matrix, node 1 pulled downward, train split
+s4_train_003_node_down: S4 stiffness matrix, node 1 pulled below the plane in negative Z, train split
 **
 ** Node order: 1-2-3-4 counterclockwise
 ** DOF order: ux uy uz urx ury urz for each node
-** Geometry: node 1 is pulled from y=0 to y=-4; the element remains convex
+** Geometry: node 1 is pulled in negative Z below the original plane, forming a non-coplanar warped quadrilateral
 **
 *NODE
-1, 0.0, -4.0, 0.0
+1, 0.0,  0.0, -4.0
 2, 1.0,  0.0, 0.0
 3, 1.0,  1.0, 0.0
 4, 0.0,  1.0, 0.0

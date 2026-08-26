@@ -2,7 +2,7 @@
 
 本目录中的 `sample_001_abaqus_s4.csv` 和四个 `s4_*_abaqus_s4.csv` 均为真实 Abaqus S4 基准刚度矩阵。
 
-新增矩阵覆盖远点梯形、`6 x 1` 长方形、节点下拉畸变单元和斜平行四边形。对应原始 `.mtx`、作业日志及解析条目数见 `data/abaqus/raw/`、`data/abaqus/evidence/` 和各自元数据。
+新增矩阵覆盖远点梯形、`6 x 1` 长方形、节点 1 沿 Z 负方向拉到原平面下方形成的非共面翘曲四边形，以及斜平行四边形。对应原始 `.mtx`、作业日志及解析条目数见 `data/abaqus/raw/`、`data/abaqus/evidence/` 和各自元数据。
 
 生成链路：
 
