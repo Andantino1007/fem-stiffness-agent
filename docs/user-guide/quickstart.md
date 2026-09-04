@@ -54,6 +54,12 @@ python -m shell_agent verify --sample data/abaqus/meta/sample_001.json --report 
 4. 运行适配器测试；
 5. 写出单样本报告。
 
+在 macOS 上使用 `clang++` 时，不同编译器的浮点末位可能使已跟踪的
+`data/cpp/*.csv` 实现矩阵显示为已修改。验证后先运行
+`git diff -- data/cpp`，确认差异只来自本次生成的实现矩阵；不要把这类
+生成差异作为文档修改提交，也不要改动 `data/abaqus/matrix/` 中的参考矩阵。
+具体处理见 [故障排查](troubleshooting.md#macosclang-验证后实现矩阵显示为已修改)。
+
 ## 第三步：验证开发数据集
 
 ```bash

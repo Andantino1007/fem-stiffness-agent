@@ -78,6 +78,29 @@ python -m shell_agent verify
 
 批量结果默认写入 `build/verification/dataset-results.json`。先查看失败样本对应的 `build/verification/dataset-reports/<split>/` 报告。
 
+## macOS/Clang 验证后实现矩阵显示为已修改
+
+内置 S4 验证会重新生成样本元数据指定的 `data/cpp/*.csv` 实现矩阵。
+不同编译器或平台可能只在浮点数的最后几位产生文本差异，因此 macOS 使用
+`clang++` 完成验证后，`git status --short` 可能列出这些文件。
+
+先检查差异：
+
+```bash
+git diff -- data/cpp
+```
+
+如果验证前工作树是干净的，并且确认差异只来自本次验证生成的实现矩阵，
+可以恢复仓库中的版本：
+
+```bash
+git restore -- data/cpp
+```
+
+如果验证前已有本地修改，应逐文件保留和处理，不能直接恢复整个目录。
+`data/cpp/` 是实现输出；`data/abaqus/matrix/` 是可信参考矩阵，两者不能互换，
+也不要为消除跨平台末位差异而修改参考矩阵。
+
 ## Windows 命令换行失败
 
 文档中的反斜杠续行适用于 Bash。PowerShell 最稳妥的写法是一行命令：
