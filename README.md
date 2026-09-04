@@ -15,7 +15,7 @@
 - `dataset`、`primary_sample` 和 `adapter`；
 - `agent.allowed_patch_paths` 与验收目标。
 
-其他单元使用 `command` 适配器接入自己的构建、矩阵生成和测试命令。完整配置、样本格式和操作步骤见 `docs/USER_GUIDE.md`，可复制的配置见 `workflow/project.example.json`。
+其他单元使用 `command` 适配器接入自己的构建、矩阵生成和测试命令。先从 `docs/USER_GUIDE.md` 按任务选择快速开始、操作指南、参考或架构说明；可复制的配置见 `workflow/project.example.json`。
 
 ## 两个闭环
 
@@ -40,7 +40,7 @@ flowchart LR
 - `validation`：只能看到总误差数值，防止只适配训练样本；
 - `test`：最后的测试，判断是否通过
 
-数据清单路径由项目配置的 `dataset` 指定。当前 S4 示例只有一个真实 Abaqus 训练样本；验证集和测试集仍待补充。
+数据清单路径由项目配置的 `dataset` 指定。当前 S4 示例有 4 个真实 Abaqus 训练样本、1 个验证样本，测试集仍为空；开发验证不会读取 test，最终验收条件尚未满足。
 
 ### 数值优化闭环
 
@@ -207,7 +207,8 @@ python -m shell_agent resume <运行编号>
 | --- | --- |
 | `workflow/project.json` | 当前单元类型、矩阵尺寸、适配器和 Agent 边界 |
 | `workflow/project.example.json` | 新单元配置示例 |
-| `docs/USER_GUIDE.md` | 通用接入、数据集和规划重置手册 |
+| `docs/USER_GUIDE.md` | 用户任务导航与标准操作主流程 |
+| `docs/user-guide/` | 快速开始、新单元接入、参考、排错和架构说明 |
 | `src/shell/ShellStiffness.cpp` | 当前内置 S4 数值实现 |
 | `tests/shell_stiffness_tests.cpp` | Catch2 物理与回归测试 |
 | `data/datasets/shell_stiffness.json` | 三划分数据清单 |
