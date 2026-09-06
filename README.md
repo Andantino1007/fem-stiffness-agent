@@ -2,20 +2,20 @@
 
 ## 项目目标
 
-本项目提供配置驱动的单元矩阵数值对齐流程。单元类型、方阵尺寸、自由度分组、数据集、数值适配器和 Agent 可修改源码都由 `workflow/project.json` 声明；公共层负责数据治理、误差比较、候选门禁、回退和多智能体编排。
+本项目提供配置驱动的单元矩阵数值对齐流程。单元类型、方阵尺寸、自由度分组、数据集、数值适配器和 Agent 可修改源码都由 `stiffness_agent/config/project.json` 声明；公共层负责数据治理、误差比较、候选门禁、回退和多智能体编排。
 
 仓库当前配置仍以 Abaqus S4 为首个内置适配器和示例项目。`sample_001` 的 Frobenius 相对误差为 `0.0595967`，约 `5.95967%`；这不是公共框架的 `24 x 24` 限制。
 
 ## 接入新单元
 
-用户主要修改 `workflow/project.json` 中的：
+用户主要修改 `stiffness_agent/config/project.json` 中的：
 
 - `element_type` 和 `matrix_dimensions`；
 - `node_count`、`dof_labels_per_node` 和 `diagnostic_groups`；
 - `dataset`、`primary_sample` 和 `adapter`；
 - `agent.allowed_patch_paths` 与验收目标。
 
-其他单元使用 `command` 适配器接入自己的构建、矩阵生成和测试命令。先从 `docs/USER_GUIDE.md` 按任务选择快速开始、操作指南、参考或架构说明；可复制的配置见 `workflow/project.example.json`。
+其他单元需要提供自己的矩阵计算程序，并在项目配置中写明怎样运行它；该配置的技术名称是 `command` 接入方式。先从 `docs/用户手册.md` 按任务选择快速开始、操作指南、参考或架构说明；可复制的配置见 `stiffness_agent/config/project.example.json`。
 
 ## 两个闭环
 
@@ -81,13 +81,13 @@ flowchart LR
 安装 LangGraph 依赖：
 
 ```bash
-python -m pip install -r requirements-langgraph.txt
+python -m pip install -r requirements.txt
 ```
 
 检查本地编排环境，不调用在线接口：
 
 ```bash
-python -m shell_agent check
+python -m stiffness_agent check
 ```
 
 ## 常用命令
@@ -95,23 +95,23 @@ python -m shell_agent check
 ### 校验项目配置
 
 ```bash
-python -m shell_agent validate-project
+python -m stiffness_agent validate-project
 ```
 
 ### 主样本与适配器测试
 
 ```bash
-python -m shell_agent verify
+python -m stiffness_agent verify
 ```
 
-默认报告：`docs/verification/sample-001-report.md`。
+默认报告：`docs/verification/样本001验证报告.md`。
 
 ### 重置并重新规划
 
 ```bash
-python -m shell_agent reset-plan \
+python -m stiffness_agent reset-plan \
   --reason "切换为新的单元类型、矩阵尺寸或数据集"
-python -m shell_agent replan
+python -m stiffness_agent replan
 ```
 
 `reset-plan` 会归档旧活动记忆，不删除历史运行；`replan` 只运行基线和 Planner，不修改源码。
@@ -119,27 +119,27 @@ python -m shell_agent replan
 ### 训练集、验证集和测试集批量验证
 
 ```bash
-python -m shell_agent verify-dataset
+python -m stiffness_agent verify-dataset
 ```
 
 最终严格验收要求验证集、测试集和测试锁全部就绪：
 
 ```bash
-python -m shell_agent verify-dataset --require-test
+python -m stiffness_agent verify-dataset --require-test
 ```
 
 ### 校验数据生成计划
 
 ```bash
-python -m shell_agent validate-data-plan \
+python -m stiffness_agent validate-data-plan \
   data/datasets/plans/example_train_batch.json
 ```
 
 ### 登记可信参考样本
 
 ```bash
-python -m shell_agent register-sample \
-  --meta data/my_element/meta/sample_002.json \
+python -m stiffness_agent register-sample \
+  --meta data/my_element/metadata/sample_002.json \
   --split train
 ```
 
@@ -148,14 +148,14 @@ python -m shell_agent register-sample \
 ### 检查测试集锁
 
 ```bash
-python -m shell_agent check-test-lock
+python -m stiffness_agent check-test-lock
 ```
 
 ### 检查在线接口
 
 ```bash
 cp .env.example .env
-python -m shell_agent api-check
+python -m stiffness_agent api-check
 ```
 
 真实密钥只写入 `.env`，不能提交到 Git。
@@ -163,13 +163,13 @@ python -m shell_agent api-check
 ### 启动在线数值迭代
 
 ```bash
-python -m shell_agent run --max-iterations 3
+python -m stiffness_agent run --max-iterations 3
 ```
 
 接口或节点失败后，可以从 SQLite 检查点恢复：
 
 ```bash
-python -m shell_agent resume <运行编号>
+python -m stiffness_agent resume <运行编号>
 ```
 
 ## 数值指标
@@ -188,15 +188,13 @@ python -m shell_agent resume <运行编号>
 
 ```text
 .
-├── agents/                 智能体提示词与角色约束
 ├── data/                   Abaqus 基准、样本元数据和数据集划分
 ├── docs/                   需求、理论、Abaqus 和验证文档
-├── include/shell/          C++ 公共接口
+├── include/fem/s4/         C++ 公共接口
 ├── scripts/                图编排、智能体调用和 Abaqus 工具
-├── shell_agent/            统一 Python 命令行与验证驱动
-├── src/shell/              C++ 壳单元实现
+├── stiffness_agent/        命令行、项目配置和智能体提示词
+├── src/fem/s4/             C++ 壳单元实现
 ├── tests/                  C++ 与 Python 测试
-├── workflow/               检查点、实验记忆和历史运行记录
 ├── CMakeLists.txt          CMake 构建入口
 └── README.md               项目入口说明
 ```
@@ -205,23 +203,23 @@ python -m shell_agent resume <运行编号>
 
 | 文件 | 用途 |
 | --- | --- |
-| `workflow/project.json` | 当前单元类型、矩阵尺寸、适配器和 Agent 边界 |
-| `workflow/project.example.json` | 新单元配置示例 |
-| `docs/USER_GUIDE.md` | 用户任务导航与标准操作主流程 |
-| `docs/user-guide/` | 快速开始、新单元接入、参考、排错和架构说明 |
-| `src/shell/ShellStiffness.cpp` | 当前内置 S4 数值实现 |
-| `tests/shell_stiffness_tests.cpp` | Catch2 物理与回归测试 |
-| `data/datasets/shell_stiffness.json` | 三划分数据清单 |
+| `stiffness_agent/config/project.json` | 当前单元类型、矩阵尺寸、适配器和 Agent 边界 |
+| `stiffness_agent/config/project.example.json` | 新单元配置示例 |
+| `docs/用户手册.md` | 用户任务导航与标准操作主流程 |
+| `docs/用户手册/` | 快速开始、新单元接入、参考、运行检查和架构说明 |
+| `src/fem/s4/S4Stiffness.cpp` | 当前内置 S4 数值实现 |
+| `tests/s4_stiffness_tests.cpp` | Catch2 物理与回归测试 |
+| `data/datasets/s4_stiffness.json` | 三划分数据清单 |
 | `data/datasets/test-lock.json` | 最终测试集哈希锁 |
-| `shell_agent/dataset_plan.py` | 数据计划确定性门禁 |
-| `shell_agent/dataset_registry.py` | 样本校验、登记和测试锁 |
-| `shell_agent/project_config.py` | 通用项目配置校验 |
-| `shell_agent/matrix_validation.py` | 任意尺寸方阵读取与公共误差计算 |
-| `shell_agent/verification.py` | 内置与命令适配器协议 |
-| `shell_agent/dataset_verification.py` | 三划分批量验证 |
-| `scripts/graph.py` | LangGraph 节点和条件路由 |
-| `scripts/agents.py` | 数值诊断、补丁门禁、智能体上下文和接受规则 |
-| `workflow/experiment-memory.json` | 跨运行实验记忆 |
+| `stiffness_agent/dataset_plan.py` | 数据计划确定性门禁 |
+| `stiffness_agent/dataset_registry.py` | 样本校验、登记和测试锁 |
+| `stiffness_agent/project_config.py` | 通用项目配置校验 |
+| `stiffness_agent/matrix_validation.py` | 任意尺寸方阵读取与公共误差计算 |
+| `stiffness_agent/verification.py` | 内置与命令适配器协议 |
+| `stiffness_agent/dataset_verification.py` | 三划分批量验证 |
+| `scripts/langgraph_workflow.py` | LangGraph 节点和条件路由 |
+| `scripts/agent_workflow.py` | 数值诊断、补丁门禁、智能体上下文和接受规则 |
+| `build/workflow/experiment-memory.json` | 跨运行实验记忆 |
 
 ## 安全与维护
 
@@ -232,4 +230,4 @@ python -m shell_agent resume <运行编号>
 - 训练集、验证集和测试集不得重叠；
 - 测试集生成后必须锁定哈希，任何变化都使最终验收失败；
 - `build/`、Python 缓存和系统缓存都是可重新生成的本地产物；
-- `workflow/runs/` 是历史审计记录，不参与代码版本控制。
+- `build/workflow/runs/` 是历史审计记录，不参与代码版本控制。

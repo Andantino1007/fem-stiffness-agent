@@ -1,6 +1,6 @@
 # 数据目录
 
-本目录保存样本输入、可信参考矩阵、样本元数据和实现输出矩阵。公共契约支持项目配置声明的任意方阵尺寸；当前 `abaqus/` 和 `cpp/` 是 S4 示例数据。
+本目录保存样本输入、可信参考矩阵、样本元数据和实现输出矩阵。公共契约支持项目配置声明的任意方阵尺寸；当前 `reference/abaqus/` 和 `implementation/` 保存 S4 示例数据。
 
 ## 目录结构
 
@@ -8,11 +8,14 @@
 data/
 ├── datasets/               训练集、验证集和测试集划分清单
 ├── templates/              通用样本元数据和数据集模板
-├── abaqus/
-│   ├── input/      Abaqus 输入文件
-│   ├── matrix/     Abaqus 导出的 24 x 24 基准矩阵
-│   └── meta/       样本参数与数据来源说明
-└── cpp/            C++ 生成的 24 x 24 矩阵
+├── reference/
+│   └── abaqus/
+│       ├── input_decks/    Abaqus 输入文件
+│       ├── raw_matrices/   Abaqus 原始文本矩阵
+│       ├── matrices/       转换后的可信参考矩阵
+│       ├── logs/           作业日志与导出证据
+│       └── metadata/       样本参数与数据来源说明
+└── implementation/         当前实现生成的矩阵
 ```
 
 ## 当前样本
@@ -30,10 +33,10 @@ data/
 每个样本至少应包含：
 
 ```text
-data/abaqus/input/<sample_id>_*.inp
-data/abaqus/meta/<sample_id>.json
-data/abaqus/matrix/<sample_id>_abaqus_s4.csv
-data/cpp/<sample_id>_cpp.csv
+data/reference/abaqus/input_decks/<sample_id>_*.inp
+data/reference/abaqus/metadata/<sample_id>.json
+data/reference/abaqus/matrices/<sample_id>_reference.csv
+data/implementation/<sample_id>_implementation.csv
 ```
 
 当前 S4 示例矩阵 CSV 必须满足：
@@ -44,7 +47,7 @@ data/cpp/<sample_id>_cpp.csv
 - Abaqus 与 C++ 使用相同单位制。
 - 基准矩阵来源必须记录在对应元数据中。
 
-其他单元的矩阵尺寸取自 `workflow/project.json` 的 `matrix_dimensions`，样本使用 `reference_matrix` 和 `implementation_matrix` 两个通用字段。完整格式见 `docs/USER_GUIDE.md` 和 `data/templates/`。
+其他单元的矩阵尺寸取自 `stiffness_agent/config/project.json` 的 `matrix_dimensions`，样本使用 `reference_matrix` 和 `implementation_matrix` 两个通用字段。完整格式见 `docs/用户手册.md` 和 `data/templates/`。
 
 ## 新增样本建议
 
@@ -54,4 +57,4 @@ data/cpp/<sample_id>_cpp.csv
 
 ## 训练集、验证集与测试集
 
-划分清单位于 `data/datasets/shell_stiffness.json`。训练集用于智能体数值迭代，验证集用于候选筛选，锁定测试集只用于最终泛化验收。同一样本禁止同时进入多个集合。
+划分清单位于 `data/datasets/s4_stiffness.json`。训练集用于智能体数值迭代，验证集用于候选筛选，锁定测试集只用于最终泛化验收。同一样本禁止同时进入多个集合。

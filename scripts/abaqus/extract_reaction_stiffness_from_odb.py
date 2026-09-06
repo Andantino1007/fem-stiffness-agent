@@ -1,5 +1,5 @@
 # 使用 Abaqus Python 运行：
-#   abaqus python scripts\abaqus\extract_reaction_stiffness_from_odb.py sample_001_s4_reaction_export.odb data\abaqus\matrix\sample_001_abaqus_s4.csv
+#   abaqus python scripts\abaqus\extract_reaction_stiffness_from_odb.py sample_001_s4_reaction_export.odb data\reference\abaqus\matrices\sample_001_reference.csv
 
 from __future__ import annotations
 

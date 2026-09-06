@@ -10,7 +10,7 @@
   "samples": [
     {
       "sample_id": "s4_train_001_trapezoid_far",
-      "input_file": "data/abaqus/input/s4_train_001_trapezoid_far_matrix_export.inp",
+      "input_file": "data/reference/abaqus/input_decks/s4_train_001_trapezoid_far_matrix_export.inp",
       "geometry_case": "far_node_trapezoid",
       "nodes": [[0.0, 0.0, 0.0], [6.0, 0.0, 0.0], [2.0, 1.0, 0.0], [0.0, 1.0, 0.0]],
       "E": 210000000000.0,
@@ -19,7 +19,7 @@
     },
     {
       "sample_id": "s4_train_002_long_rectangle",
-      "input_file": "data/abaqus/input/s4_train_002_long_rectangle_matrix_export.inp",
+      "input_file": "data/reference/abaqus/input_decks/s4_train_002_long_rectangle_matrix_export.inp",
       "geometry_case": "long_rectangle",
       "nodes": [[0.0, 0.0, 0.0], [6.0, 0.0, 0.0], [6.0, 1.0, 0.0], [0.0, 1.0, 0.0]],
       "E": 210000000000.0,
@@ -28,7 +28,7 @@
     },
     {
       "sample_id": "s4_train_003_node_down",
-      "input_file": "data/abaqus/input/s4_train_003_node_down_matrix_export.inp",
+      "input_file": "data/reference/abaqus/input_decks/s4_train_003_node_down_matrix_export.inp",
       "geometry_case": "node_1_negative_z_warped",
       "geometry_description": "节点 1 沿 Z 负方向拉到原平面下方，形成非共面翘曲四边形",
       "nodes": [[0.0, 0.0, -4.0], [1.0, 0.0, 0.0], [1.0, 1.0, 0.0], [0.0, 1.0, 0.0]],

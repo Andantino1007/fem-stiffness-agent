@@ -4,13 +4,15 @@
 
 ```text
 src/
-├── shell_stiffness_cli.cpp
-└── shell/
-    ├── Matrix24.cpp
-    ├── ShellElementInput.cpp
-    ├── CsvMatrixIO.cpp
-    ├── MatrixCompare.cpp
-    └── ShellStiffness.cpp
+├── cli/
+│   └── s4_stiffness_cli.cpp
+└── fem/
+    └── s4/
+        ├── Matrix24.cpp
+        ├── S4ElementInput.cpp
+        ├── CsvMatrixIO.cpp
+        ├── MatrixCompare.cpp
+        └── S4Stiffness.cpp
 ```
 
 ## 当前数据流
@@ -27,7 +29,7 @@ src/
 
 ## 当前物理实现
 
-`ShellStiffness.cpp` 当前实现包括：
+`S4Stiffness.cpp` 当前实现包括：
 
 - 四节点赖斯纳－明德林壳物理基线。
 - 膜、弯曲、剪切和钻转分量。

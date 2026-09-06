@@ -4,7 +4,7 @@
 
 ## C++ 数值测试
 
-`shell_stiffness_tests.cpp` 当前有 7 个测试用例、621 个断言，覆盖：
+`s4_stiffness_tests.cpp` 当前有 7 个测试用例：
 
 - 矩阵尺寸和误差可计算性。
 - 总矩阵及四个物理分量的对称性。
@@ -15,12 +15,12 @@
 - 非法材料参数。
 
 ```bash
-python -m shell_agent verify
+python -m stiffness_agent verify
 ```
 
 ## Python 工作流测试
 
-- `agent_openai_client_tests.py`：两种接口格式、返回解析和 404 在线接口回退。
+- `model_api_client_tests.py`：两种接口格式、返回解析和 404 在线接口回退。
 - `agents_tests.py`：补丁提取、路径白名单、危险调用拒绝、规划 JSON 校验和语义重复指纹。
 - `graph_tests.py`：接口预检、重试分类、规划及重复门禁条件路由和图节点编译。
 

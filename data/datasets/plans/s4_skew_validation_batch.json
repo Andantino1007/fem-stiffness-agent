@@ -10,7 +10,7 @@
   "samples": [
     {
       "sample_id": "s4_validation_001_skew",
-      "input_file": "data/abaqus/input/s4_validation_001_skew_matrix_export.inp",
+      "input_file": "data/reference/abaqus/input_decks/s4_validation_001_skew_matrix_export.inp",
       "geometry_case": "skew_parallelogram",
       "nodes": [[0.0, 0.0, 0.0], [2.5, 0.0, 0.0], [3.25, 1.25, 0.0], [0.75, 1.25, 0.0]],
       "E": 210000000000.0,

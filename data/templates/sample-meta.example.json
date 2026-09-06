@@ -2,7 +2,7 @@
   "sample_id": "train_001",
   "element_type": "MY_ELEMENT",
   "parameters": {
-    "description": "适配器所需的任意材料、几何或积分参数"
+    "description": "矩阵计算程序所需的任意材料、几何或积分参数"
   },
   "reference_matrix_source": {
     "status": "verified_external_reference",
@@ -10,5 +10,5 @@
     "job": "可追溯作业编号"
   },
   "reference_matrix": "data/my_element/reference/train_001.csv",
-  "implementation_matrix": "data/my_element/actual/train_001.csv"
+  "implementation_matrix": "data/my_element/implementation/train_001.csv"
 }

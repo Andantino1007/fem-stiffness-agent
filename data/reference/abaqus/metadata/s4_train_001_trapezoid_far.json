@@ -1,0 +1,33 @@
+{
+  "sample_id": "s4_train_001_trapezoid_far",
+  "element_type": "Abaqus S4",
+  "node_order": "counterclockwise",
+  "dof_order_per_node": ["x", "y", "z", "rx", "ry", "rz"],
+  "nodes": [
+    {"id": 1, "coord": [0.0, 0.0, 0.0]},
+    {"id": 2, "coord": [6.0, 0.0, 0.0]},
+    {"id": 3, "coord": [2.0, 1.0, 0.0]},
+    {"id": 4, "coord": [0.0, 1.0, 0.0]}
+  ],
+  "material": {
+    "type": "isotropic_linear_elastic",
+    "E": 210000000000.0,
+    "nu": 0.3
+  },
+  "section": {
+    "thickness": 0.01
+  },
+  "reference_matrix_source": {
+    "status": "real_abaqus_export",
+    "solver": "Abaqus 2024",
+    "job": "s4_train_001_trapezoid_far",
+    "input_file": "data/reference/abaqus/input_decks/s4_train_001_trapezoid_far_matrix_export.inp",
+    "method": "MATRIX GENERATE -> MATRIX OUTPUT COORDINATE -> STIF1.mtx -> CSV",
+    "source_mtx_name": "s4_train_001_trapezoid_far_STIF1.mtx",
+    "source_mtx": "data/reference/abaqus/raw_matrices/s4_train_001_trapezoid_far_STIF1.mtx",
+    "evidence_log": "data/reference/abaqus/logs/s4_train_001_trapezoid_far.msg",
+    "parsed_entries": 376
+  },
+  "reference_matrix": "data/reference/abaqus/matrices/s4_train_001_trapezoid_far_reference.csv",
+  "implementation_matrix": "data/implementation/s4_train_001_trapezoid_far_implementation.csv"
+}

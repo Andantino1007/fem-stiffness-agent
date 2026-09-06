@@ -13,7 +13,7 @@ __pycache__/
 # C++ 本地构建产物
 build/
 
-# Abaqus 本地运行产物（可追溯的矩阵和证据日志保存在 data/abaqus/）
+# Abaqus 本地运行产物（可追溯的矩阵和证据日志保存在 data/reference/abaqus/）
 *.com
 *.dat
 *.lck
@@ -30,16 +30,10 @@ build/
 *.stt
 /*.msg
 /*_STIF1.mtx
-!data/abaqus/evidence/*.dat
+!data/reference/abaqus/logs/*.dat
 
-# LangGraph 本地 checkpoint
-workflow/checkpoints/*.sqlite
-workflow/checkpoints/*.sqlite-*
-
-# 本地运行审计记录（保留在磁盘，不纳入代码版本）
-workflow/runs/
-workflow/archive/
-workflow/plans/
+# 多智能体运行状态、检查点和审计记录
+build/workflow/
 
 # 外部参考资料（保留在磁盘，不纳入代码版本）
 参考资料/

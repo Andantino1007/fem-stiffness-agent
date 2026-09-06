@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "project_id": "abaqus-s4-stiffness",
+  "element_type": "Abaqus S4",
+  "matrix_dimensions": [24, 24],
+  "node_count": 4,
+  "dof_labels_per_node": ["ux", "uy", "uz", "rx", "ry", "rz"],
+  "diagnostic_groups": {
+    "membrane_xy": ["ux", "uy"],
+    "bending_shear": ["uz", "rx", "ry"],
+    "drilling": ["rz"]
+  },
+  "dataset": "data/datasets/s4_stiffness.json",
+  "primary_sample": "data/reference/abaqus/metadata/sample_001.json",
+  "reference_generation_methods": ["matrix_generate", "reaction_odb"],
+  "adapter": {
+    "kind": "builtin_s4"
+  },
+  "agent": {
+    "allowed_patch_paths": ["src/fem/s4/S4Stiffness.cpp"],
+    "test_paths": ["tests/s4_stiffness_tests.cpp"],
+    "experiment_classes": [
+      "membrane",
+      "bending",
+      "transverse_shear",
+      "drilling",
+      "dof_mapping",
+      "local_coordinates",
+      "integration"
+    ]
+  },
+  "acceptance": {
+    "target_error": 0.01,
+    "min_frobenius_absolute_drop": 1e-06,
+    "min_frobenius_relative_drop": 0.0001,
+    "max_symmetry_error": 1e-12,
+    "max_absolute_error_regression": 0.01,
+    "max_non_target_block_regression": 0.05,
+    "max_validation_error_regression": 0.0
+  }
+}
