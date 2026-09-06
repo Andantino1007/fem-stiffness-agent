@@ -15,13 +15,14 @@ from .project_config import ProjectConfig, load_project_config
 from .verification import ROOT
 
 
-MEMORY_PATH = ROOT / "build" / "workflow" / "experiment-memory.json"
-PLANNING_STATE_PATH = ROOT / "build" / "workflow" / "planning-state.json"
-ARCHIVE_ROOT = ROOT / "build" / "workflow" / "archive"
-PLANS_ROOT = ROOT / "build" / "workflow" / "plans"
-LATEST_REPORT_PATH = ROOT / "docs" / "verification" / "智能体最新迭代报告.md"
+WORKFLOW_DIR = ROOT / "build" / "workflow"
+MEMORY_PATH = WORKFLOW_DIR / "experiment-memory.json"
+PLANNING_STATE_PATH = WORKFLOW_DIR / "planning-state.json"
+ARCHIVE_ROOT = WORKFLOW_DIR / "archive"
+PLANS_ROOT = WORKFLOW_DIR / "plans"
+LATEST_REPORT_PATH = WORKFLOW_DIR / "latest-report.md"
 PROGRESS_PATH = ROOT / "docs" / "项目进度与下一步.md"
-PROGRESS_LOG_PATH = ROOT / "docs" / "verification" / "项目进度日志.md"
+PROGRESS_LOG_PATH = WORKFLOW_DIR / "progress-log.md"
 STATUS_START = "<!-- AGENT_WORKFLOW_STATUS_START -->"
 STATUS_END = "<!-- AGENT_WORKFLOW_STATUS_END -->"
 
@@ -178,21 +179,24 @@ def reset_planning(reason: str) -> dict[str, Any]:
         encoding="utf-8",
     )
     _replace_progress_status(project, generation, reason)
-    if PROGRESS_LOG_PATH.is_file():
-        existing = PROGRESS_LOG_PATH.read_text(encoding="utf-8").rstrip()
-        entry = "\n".join(
-            [
-                "",
-                f"## {datetime.now().date().isoformat()}：规划代次重置为 `{generation}`",
-                "",
-                f"- 项目：`{project.project_id}`",
-                "- 状态：`awaiting_replan`",
-                f"- 原因：{reason}",
-                f"- 归档：`{archive_dir.relative_to(ROOT)}`",
-                "",
-            ]
-        )
-        PROGRESS_LOG_PATH.write_text(existing + "\n" + entry, encoding="utf-8")
+    existing = (
+        PROGRESS_LOG_PATH.read_text(encoding="utf-8").rstrip()
+        if PROGRESS_LOG_PATH.is_file()
+        else "# 项目进度日志"
+    )
+    entry = "\n".join(
+        [
+            "",
+            f"## {datetime.now().date().isoformat()}：规划代次重置为 `{generation}`",
+            "",
+            f"- 项目：`{project.project_id}`",
+            "- 状态：`awaiting_replan`",
+            f"- 原因：{reason}",
+            f"- 归档：`{archive_dir.relative_to(ROOT)}`",
+            "",
+        ]
+    )
+    PROGRESS_LOG_PATH.write_text(existing + "\n" + entry, encoding="utf-8")
     return state
 
 

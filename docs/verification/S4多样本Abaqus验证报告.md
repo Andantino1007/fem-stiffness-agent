@@ -2,7 +2,7 @@
 
 ## 执行范围
 
-- 基线提交：`60d469541c86cb4ced1a87cee42298a746df17fc`
+- 验证前代码基线：`3a4acdd0b5e49db53bb020bb139b22cd40eee3f5`
 - 参考求解器：Abaqus 2024
 - 单元：单个 S4，4 节点，每节点 6 自由度
 - 材料：`E=2.1e11`，`nu=0.3`
@@ -28,19 +28,19 @@
 
 | 划分 | 样本 | Frobenius 相对误差 | 最大绝对误差 | 对称性误差 |
 | --- | --- | ---: | ---: | ---: |
-| train | `s4_train_001_trapezoid_far` | 0.339246 | 1.68835e+09 | 5.11124e-17 |
-| train | `s4_train_002_long_rectangle` | 0.117996 | 4.38123e+08 | 1.42888e-17 |
-| train | `s4_train_003_node_down` | 0.365536 | 8.66088e+08 | 1.0391e-16 |
-| validation | `s4_validation_001_skew` | 0.209217 | 2.79829e+08 | 3.01256e-17 |
+| train | `s4_train_001_trapezoid_far` | 0.335996 | 1.68835e+09 | 4.98498e-17 |
+| train | `s4_train_002_long_rectangle` | 0.123769 | 4.84241e+08 | 2.52787e-24 |
+| train | `s4_train_003_node_down` | 0.357604 | 7.30223e+08 | 9.63013e-17 |
+| validation | `s4_validation_001_skew` | 0.207454 | 2.79829e+08 | 3.35683e-17 |
 
-`verify-dataset --development` 对包含原始 `sample_001` 的完整训练集给出：4 个训练样本，平均 Frobenius 相对误差 `0.220593675`，最差样本为 `s4_train_003_node_down`，误差 `0.365536`。验证集已就绪，最差误差 `0.209217`。开发验证未读取 test；测试集仍为空，因此 `final_evaluation_ready=false`。本报告不宣称达到 `1%` 数值验收目标。
+`verify-dataset --development` 对包含原始 `sample_001` 的完整训练集给出：4 个训练样本，平均 Frobenius 相对误差 `0.214598875`，最差样本为 `s4_train_003_node_down`，误差 `0.357604`。验证集已就绪，最差误差 `0.207454`。开发验证未读取 test；测试集仍为空，因此 `final_evaluation_ready=false`。本报告不宣称达到 `1%` 数值验收目标。
 
 ## 测试结果
 
 - `python -m stiffness_agent check`：通过；项目配置、Python 3.13、LangGraph 1.2.11 和 SQLite checkpoint 3.1.1 均通过检查。
-- `python -m stiffness_agent verify-dataset --development`：通过；训练 4 个、验证 1 个，明确跳过 test，结果写入 `build/verification/abaqus-s4-stiffness/dataset-results.json`。
-- Python 工作流：`python -m unittest discover -s tests -p '*_tests.py' -v`，34 个测试通过。
-- C++ 数值测试：Intel oneAPI 2025.1 `icx`，7 个测试用例、621 个断言全部通过；新增非共面翘曲矩阵的有限性、非零性和对称性回归。
+- `python -m stiffness_agent verify-dataset --development`：通过；训练 4 个、验证 1 个，明确跳过 test，结果写入 `build/verification/dataset-results.json`。
+- Python 工作流：`python -m unittest discover -s tests -p '*_tests.py' -v`，35 个测试通过。
+- C++ 数值测试：WSL Ubuntu GCC 13.3，7 个测试用例、621 个断言全部通过；包含非共面翘曲矩阵的有限性、非零性和对称性回归。
 - 转换器回归：完整对称矩阵不重复累加、三角矩阵自动补齐、不一致对称条目拒绝，3 个测试全部通过。
 
 完整 Abaqus 作业证据保存在 `data/reference/abaqus/logs/`。003 的 `.msg` 和 `.dat` 日志记录了 `MATRIX OUTPUT FORMAT - COORDINATE`、两条输入警告、分析完成和 0 errors。

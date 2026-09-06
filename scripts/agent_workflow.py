@@ -29,7 +29,8 @@ from stiffness_agent.verification import sample_matrix_paths
 ROOT = Path(__file__).resolve().parents[1]
 PROJECT = load_project_config(DEFAULT_PROJECT_PATH)
 PROMPTS_DIR = ROOT / "stiffness_agent" / "prompts"
-RUNS_DIR = ROOT / "build" / "workflow" / "runs"
+WORKFLOW_DIR = ROOT / "build" / "workflow"
+RUNS_DIR = WORKFLOW_DIR / "runs"
 SOURCE_PATHS = [ROOT / path for path in PROJECT.allowed_patch_paths]
 SOURCE_PATH = SOURCE_PATHS[0]
 REPORT_PATH = ROOT / "docs" / "verification" / "样本001验证报告.md"
@@ -37,9 +38,9 @@ ABAQUS_MATRIX_PATH, CPP_MATRIX_PATH, _PRIMARY_SAMPLE = sample_matrix_paths(
     ROOT / PROJECT.primary_sample_path
 )
 PROGRESS_OVERVIEW_PATH = ROOT / "docs" / "项目进度与下一步.md"
-PROGRESS_LOG_PATH = ROOT / "docs" / "verification" / "项目进度日志.md"
-LATEST_REPORT_PATH = ROOT / "docs" / "verification" / "智能体最新迭代报告.md"
-EXPERIMENT_MEMORY_PATH = ROOT / "build" / "workflow" / "experiment-memory.json"
+PROGRESS_LOG_PATH = WORKFLOW_DIR / "progress-log.md"
+LATEST_REPORT_PATH = WORKFLOW_DIR / "latest-report.md"
+EXPERIMENT_MEMORY_PATH = WORKFLOW_DIR / "experiment-memory.json"
 
 ALLOWED_PATCH_PATHS = set(PROJECT.allowed_patch_paths)
 GLOBAL_METRIC_KEYS = {
@@ -1027,9 +1028,11 @@ def update_progress_overview_status(
 
 
 def append_progress_log(state: dict[str, Any], progress_path: Path = PROGRESS_LOG_PATH) -> None:
-    if not progress_path.exists():
-        return
-    text = progress_path.read_text(encoding="utf-8")
+    text = (
+        progress_path.read_text(encoding="utf-8")
+        if progress_path.exists()
+        else "# 项目进度日志\n"
+    )
     if state["run_id"] in text:
         return
     entry = "\n".join(
@@ -1045,7 +1048,7 @@ def append_progress_log(state: dict[str, Any], progress_path: Path = PROGRESS_LO
             "",
         ]
     )
-    progress_path.write_text(text.rstrip() + "\n" + entry, encoding="utf-8")
+    write_text(progress_path, text.rstrip() + "\n" + entry)
 
 
 def progress_agent(state: dict[str, Any], run_dir: Path) -> None:
